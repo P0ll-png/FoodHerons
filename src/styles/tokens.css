@@ -1,0 +1,124 @@
+/* ============================================================
+   Food Herons — Design Tokens
+   Palette: 2 shades of orange, a few yellows, mostly white.
+   No blue. Foodpanda-inspired warmth, campus-casual tone.
+   ============================================================ */
+
+:root {
+  /* ---- Brand oranges (the 2 shades) ---- */
+  --orange: #F2622E;          /* primary orange — CTAs, brand */
+  --orange-dark: #D94A18;     /* second shade — hover/pressed, depth */
+  --orange-soft: #FFE7DA;     /* tinted orange surface */
+
+  /* ---- Yellows (a few) ---- */
+  --yellow: #FFC72C;          /* highlight / accent */
+  --yellow-bright: #FFD95A;   /* badges, open-now */
+  --yellow-pale: #FFF4D1;     /* soft yellow surface */
+
+  /* ---- Neutrals: mostly white + warm greys ---- */
+  --white: #FFFFFF;
+  --cream: #FFFBF6;           /* page background, barely warm */
+  --surface: #FFFFFF;         /* card surface */
+  --surface-2: #FFF6EE;       /* subtle alt surface */
+  --border: #F0E6DC;          /* hairline borders */
+  --border-strong: #E6D7C8;
+
+  --ink: #2B2622;             /* body text — warm near-black */
+  --ink-soft: #6B6158;        /* secondary text */
+  --ink-faint: #9A8F84;       /* tertiary / placeholders */
+
+  --success: #2E8B57;
+  --danger: #D94A18;
+
+  /* ---- Semantic roles ---- */
+  --bg: var(--cream);
+  --bg-elevated: var(--surface);
+  --text: var(--ink);
+  --text-muted: var(--ink-soft);
+  --text-faint: var(--ink-faint);
+  --primary: var(--orange);
+  --primary-hover: var(--orange-dark);
+  --on-primary: #FFFFFF;
+  --accent: var(--yellow);
+  --chip-bg: var(--surface-2);
+  --header-bg: rgba(255, 255, 255, 0.9);
+  --footer-bg: #2B2622;
+  --footer-text: #FFF4E8;
+
+  /* ---- Spacing scale (4/8 rhythm) ---- */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-7: 3rem;
+  --space-8: 4rem;
+
+  /* ---- Radii ---- */
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 22px;
+  --radius-pill: 999px;
+
+  /* ---- Shadows ---- */
+  --shadow-sm: 0 1px 2px rgba(43, 38, 34, 0.06);
+  --shadow-md: 0 6px 18px rgba(43, 38, 34, 0.08);
+  --shadow-lg: 0 16px 40px rgba(217, 74, 24, 0.12);
+
+  /* ---- Typography ---- */
+  --font-sans: "Nunito", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-display: "Poppins", "Nunito", "Segoe UI", system-ui, sans-serif;
+
+  --fs-xs: 0.75rem;
+  --fs-sm: 0.875rem;
+  --fs-base: 1rem;
+  --fs-lg: 1.125rem;
+  --fs-xl: 1.375rem;
+  --fs-2xl: 1.75rem;
+  --fs-3xl: 2.25rem;
+  --fs-4xl: clamp(2.25rem, 6vw, 3.5rem);
+
+  /* ---- Layout ---- */
+  --container: 1180px;
+  --header-h: 68px;
+  --transition: 180ms ease;
+
+  color-scheme: light;
+}
+
+/* ------------------------------------------------------------
+   Dark mode — darkened warm neutrals, same orange/yellow accents.
+   Not a blue-dominant dark theme (per brief).
+   ------------------------------------------------------------ */
+[data-theme="dark"] {
+  --white: #211C19;
+  --cream: #1A1512;
+  --surface: #241E1A;
+  --surface-2: #2C241F;
+  --border: #3A2F28;
+  --border-strong: #4A3C32;
+
+  --ink: #F7EFE7;
+  --ink-soft: #C7B9AD;
+  --ink-faint: #938577;
+
+  --orange-soft: #3A251A;
+  --yellow-pale: #3A3115;
+
+  --bg: var(--cream);
+  --bg-elevated: var(--surface);
+  --text: var(--ink);
+  --text-muted: var(--ink-soft);
+  --text-faint: var(--ink-faint);
+  --chip-bg: var(--surface-2);
+  --header-bg: rgba(26, 21, 18, 0.9);
+  --footer-bg: #141009;
+  --footer-text: #FFF4E8;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 6px 18px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.5);
+
+  color-scheme: dark;
+}
