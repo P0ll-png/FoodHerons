@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import HeronMascot from '../components/HeronMascot'
+import BlobField from '../components/BlobField'
 import './auth.css'
 
 export default function Login() {
@@ -16,8 +18,10 @@ export default function Login() {
 
   return (
     <div className="auth">
+      <BlobField className="auth__blobs" />
       <div className="auth__card">
         <span className="auth__logo" aria-hidden="true">
+          <HeronMascot className="logo-mascot" />
           <img src="/logo.png" alt="" onError={(e) => (e.currentTarget.style.display = 'none')} />
         </span>
         <h1 className="auth__title">Welcome back</h1>

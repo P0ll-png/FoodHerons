@@ -3,6 +3,11 @@
   background: var(--footer-bg);
   color: var(--footer-text);
 }
+.footer__wave {
+  /* Soft wave crest rising out of the page into the footer. */
+  margin-top: -48px;
+  margin-bottom: -1px;
+}
 
 .footer__grid {
   display: grid;
@@ -37,7 +42,7 @@
 .footer__logo {
   width: 48px;
   height: 48px;
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   background: linear-gradient(135deg, var(--orange), var(--yellow));
   display: grid;
   place-items: center;

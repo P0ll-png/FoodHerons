@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, NavLink, useNavigate } from 'react-router-dom'
 import Icon from './Icon'
+import HeronMascot from './HeronMascot'
 import { useTheme } from '../context/ThemeContext'
 import { useCart } from '../context/CartContext'
 import './Header.css'
@@ -19,6 +20,7 @@ export default function Header() {
         {/* Logo area — intentionally empty, uses logo.png when provided */}
         <Link to="/" className="brand" onClick={closeMenu} aria-label="Food Herons home">
           <span className="brand__logo">
+            <HeronMascot className="logo-mascot" />
             <img
               src="/logo.png"
               alt=""

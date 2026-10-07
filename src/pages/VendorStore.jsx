@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
 import Icon from '../components/Icon'
+import HeronMascot from '../components/HeronMascot'
 import { getVendor, categoryName } from '../data/vendors'
 import { useCart } from '../context/CartContext'
 import NotFound from './NotFound'
@@ -54,6 +55,7 @@ export default function VendorStore() {
       <header className="store-head" style={{ background: coverTint }}>
         <div className="container store-head__inner">
           <span className="store-head__logo" aria-hidden="true">
+            <HeronMascot className="logo-mascot" />
             <img
               src="/logo.png"
               alt=""
@@ -72,7 +74,7 @@ export default function VendorStore() {
             <h1>{name}</h1>
             <p className="store-head__desc">{description}</p>
             <ul className="store-head__facts">
-              <li><Icon name="star" size={16} className="fact-star" /> {rating} ({reviews} reviews)</li>
+              <li><Icon name="starSolid" size={16} className="fact-star" /> {rating} ({reviews} reviews)</li>
               <li><Icon name="pin" size={16} /> {locationArea}</li>
               <li><Icon name="clock" size={16} /> {hoursOpen}–{hoursClose}</li>
               <li><span className="chip chip--active">{categoryName(category)}</span></li>

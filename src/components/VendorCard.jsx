@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import Icon from './Icon'
+import HeronMascot from './HeronMascot'
 import { categoryName } from '../data/vendors'
 import './VendorCard.css'
 
@@ -24,6 +25,7 @@ export default function VendorCard({ vendor }) {
       <div className="vcard__cover" style={{ background: coverTint }}>
         {/* Vendor photo placeholder — logo.png or vendor photo would go here */}
         <span className="vcard__cover-logo" aria-hidden="true">
+          <HeronMascot className="logo-mascot" />
           <img
             src="/logo.png"
             alt=""
@@ -46,7 +48,7 @@ export default function VendorCard({ vendor }) {
         <div className="vcard__head">
           <h3 className="vcard__name">{name}</h3>
           <span className="vcard__rating">
-            <Icon name="star" size={15} className="vcard__star" />
+            <Icon name="starSolid" size={15} className="vcard__star" />
             {rating}
             <span className="vcard__reviews">({reviews})</span>
           </span>

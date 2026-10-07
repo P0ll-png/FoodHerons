@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import Icon from '../components/Icon'
+import HeronMascot from '../components/HeronMascot'
+import BlobField from '../components/BlobField'
 import './auth.css'
 
 export default function Signup() {
@@ -19,8 +21,10 @@ export default function Signup() {
 
   return (
     <div className="auth">
+      <BlobField className="auth__blobs" />
       <div className="auth__card">
         <span className="auth__logo" aria-hidden="true">
+          <HeronMascot className="logo-mascot" />
           <img src="/logo.png" alt="" onError={(e) => (e.currentTarget.style.display = 'none')} />
         </span>
         <h1 className="auth__title">Join Food Herons</h1>

@@ -6,8 +6,8 @@
 }
 .vcard:hover {
   color: var(--text);
-  transform: translateY(-4px);
-  box-shadow: var(--shadow-md);
+  transform: translateY(-4px) scale(1.01);
+  box-shadow: var(--shadow-soft);
   border-color: var(--border-strong);
 }
 
@@ -21,7 +21,7 @@
 .vcard__cover-logo {
   width: 64px;
   height: 64px;
-  border-radius: 16px;
+  border-radius: var(--radius-md);
   background: rgba(255, 255, 255, 0.6);
   display: grid;
   place-items: center;

@@ -180,10 +180,22 @@
   color: #fff;
   display: grid;
   place-items: center;
-  transition: background var(--transition);
+  box-shadow: var(--shadow-pop);
+  transition: background var(--transition), transform var(--transition),
+    box-shadow var(--transition);
 }
 .stepper__btn:hover {
   background: var(--orange-dark);
+}
+.stepper__btn:active {
+  transform: translateY(3px);
+  box-shadow: 0 2px 0 rgba(217, 74, 24, 0.18);
+}
+.stepper__btn:disabled,
+.stepper__btn[aria-disabled="true"] {
+  opacity: 0.5;
+  box-shadow: none;
+  transform: none;
 }
 .stepper__count {
   min-width: 20px;

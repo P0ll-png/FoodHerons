@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import Icon from '../components/Icon'
+import HeronMascot from '../components/HeronMascot'
 import { vendors } from '../data/vendors'
 import './Dashboard.css'
 
@@ -39,6 +40,7 @@ export default function Dashboard() {
     <div className="container section">
       <header className="dash-head">
         <span className="dash-head__logo" aria-hidden="true">
+          <HeronMascot className="logo-mascot" />
           <img src="/logo.png" alt="" onError={(e) => (e.currentTarget.style.display = 'none')} />
         </span>
         <div>

@@ -107,7 +107,7 @@
 }
 .dash-order__btn {
   padding: 0.5rem 1rem;
-  min-height: 40px;
+  min-height: 44px;
 }
 .dash-order__done {
   display: inline-flex;
@@ -118,7 +118,7 @@
 }
 .dash-menu__edit {
   padding: 0.5rem 1rem;
-  min-height: 40px;
+  min-height: 44px;
 }
 
 /* Profile form */

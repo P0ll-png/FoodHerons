@@ -55,16 +55,22 @@
   --space-7: 3rem;
   --space-8: 4rem;
 
-  /* ---- Radii ---- */
-  --radius-sm: 8px;
-  --radius-md: 14px;
-  --radius-lg: 22px;
-  --radius-pill: 999px;
+  /* ---- Radii (bubblier cartoon scale) ---- */
+  --radius-xs: 8px;     /* smallest soft corner */
+  --radius-sm: 14px;    /* small controls, chips-inner, role-switch buttons */
+  --radius-md: 20px;    /* inputs base, menu rows, filters, tiles, small cards */
+  --radius-lg: 28px;    /* cards, modals, hero panels, large logo slots */
+  --radius-xl: 36px;    /* feature panels / empty states */
+  --radius-pill: 999px; /* fully-rounded buttons, chips, badges, toggles */
+  --radius-blob: 42% 58% 54% 46% / 48% 44% 56% 52%; /* organic blob — decorative wrappers only */
 
   /* ---- Shadows ---- */
   --shadow-sm: 0 1px 2px rgba(43, 38, 34, 0.06);
   --shadow-md: 0 6px 18px rgba(43, 38, 34, 0.08);
   --shadow-lg: 0 16px 40px rgba(217, 74, 24, 0.12);
+  --shadow-pop: 0 4px 0 rgba(217, 74, 24, 0.22);        /* orange-family hard "pop" shadow */
+  --shadow-pop-accent: 0 4px 0 rgba(212, 160, 0, 0.28); /* yellow-family hard "pop" shadow */
+  --shadow-soft: 0 8px 22px rgba(217, 74, 24, 0.10);    /* gentle ambient lift for cards on hover */
 
   /* ---- Typography ---- */
   --font-sans: "Nunito", "Segoe UI", system-ui, -apple-system, sans-serif;
@@ -119,6 +125,9 @@
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
   --shadow-md: 0 6px 18px rgba(0, 0, 0, 0.45);
   --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.5);
+  --shadow-pop: 0 4px 0 rgba(0, 0, 0, 0.45);
+  --shadow-pop-accent: 0 4px 0 rgba(0, 0, 0, 0.45);
+  --shadow-soft: 0 8px 22px rgba(0, 0, 0, 0.5);
 
   color-scheme: dark;
 }

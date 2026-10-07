@@ -2,6 +2,7 @@ import { useMemo, useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import Icon from '../components/Icon'
 import VendorCard from '../components/VendorCard'
+import BlobField from '../components/BlobField'
 import { vendors, categories, locationAreas } from '../data/vendors'
 import './Home.css'
 
@@ -45,6 +46,7 @@ export default function Home() {
     <>
       {/* ---------- Hero ---------- */}
       <section className="hero">
+        <BlobField className="hero__blobs" />
         <div className="container hero__inner">
           <div className="hero__copy">
             <span className="hero__eyebrow">University of Makati</span>

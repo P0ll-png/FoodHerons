@@ -1,12 +1,16 @@
 import { Link } from 'react-router-dom'
+import HeronMascot from './HeronMascot'
+import WaveDivider from './WaveDivider'
 import './Footer.css'
 
 export default function Footer() {
   return (
     <footer className="footer">
+      <WaveDivider className="footer__wave" />
       <div className="container footer__grid">
         <div className="footer__brand">
           <span className="footer__logo">
+            <HeronMascot className="logo-mascot" />
             <img
               src="/logo.png"
               alt=""

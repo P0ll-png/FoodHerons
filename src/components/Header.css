@@ -29,7 +29,7 @@
 .brand__logo {
   width: 44px;
   height: 44px;
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   /* Empty logo placeholder — swap logo.png in /public to fill it */
   background: linear-gradient(135deg, var(--orange), var(--yellow));
   display: grid;
