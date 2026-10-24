@@ -1,0 +1,1403 @@
+.pf {
+  --pf-line: color-mix(in srgb, var(--red-soft) 70%, #fff);                /* pink outline on fields */
+  --pf-nav-bg: color-mix(in srgb, var(--surface) 60%, transparent);
+  --pf-nav-line: color-mix(in srgb, var(--orange-dark) 35%, transparent);
+  --pf-glow: color-mix(in srgb, var(--orange) 35%, transparent);           /* orange shadows */
+  --pf-wash: color-mix(in srgb, var(--orange) 12%, transparent);           /* orange hover wash */
+  --pf-ring: color-mix(in srgb, var(--orange) 20%, transparent);           /* focus ring */
+  min-height: 100vh;
+  min-height: 100dvh;
+  color: var(--text);
+  background: var(--surface) no-repeat;
+  background-color: var(--bg);
+  font-family: inherit;
+}
+[data-theme='dark'] .pf {
+  --pf-line: var(--border-strong);
+  --pf-nav-bg: color-mix(in srgb, var(--ink) 6%, transparent);
+  --pf-nav-line: color-mix(in srgb, var(--ink) 28%, transparent);
+}
+
+/* Main container: same width and padding as the dashboard */
+.pf-page {
+  width: 100%;
+  max-width: 1100px;
+  min-width: 0;
+  margin-inline: auto;
+  padding: 16px clamp(16px, 4vw, 40px) max(32px, env(safe-area-inset-bottom, 0px));
+}
+.pf h1, .pf h2, .pf h3, .pf p, .pf dl, .pf dd {
+  margin: 0;
+}
+.pf :focus-visible {
+  outline: 3px solid var(--orange);
+  outline-offset: 2px;
+}
+
+/* ---------- Header (brand | nav pill | avatar) ---------- */
+.pf-header {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 12px;
+  min-height: 72px;
+  padding: 12px clamp(16px, 4vw, 40px);
+  background: var(--bg);
+  backdrop-filter: blur(8px);
+}
+
+.pf-logo {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 0;
+  background: none;
+  border: 0;
+  border-radius: 999px;
+  font: inherit;
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  color: var(--text);
+  cursor: pointer;
+}
+.pf-logo:hover .pf-logo__text {
+  text-decoration: none;
+}
+.pf-logo__text { 
+  font-size: var(--fs-sm); 
+  font-weight: 900; 
+  text-transform: uppercase; 
+  white-space: nowrap; 
+  color: var(--danger); 
+}
+.pf-logo__mark { 
+  display: block; 
+  flex: none; 
+  width: 32px; 
+  height: 32px; 
+  border-radius: 50%; 
+  background: var(--orange); 
+  object-fit: cover; 
+  box-shadow: 0 3px 8px var(--pf-glow); 
+}
+
+.pf-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--pf-nav-line);
+  border-radius: 999px;
+  background: var(--pf-nav-bg);
+}
+.pf-nav__item {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  font: inherit;
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  white-space: nowrap;
+  color: var(--text);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.pf-nav__item svg {
+  flex: none;
+}
+.pf-nav__item:hover {
+  background: var(--pf-wash);
+}
+.pf-nav__item.is-on {
+  background: var(--orange);
+  color: var(--on-primary);
+  box-shadow: 0 4px 10px var(--pf-glow);
+}
+
+.pf-me {
+  justify-self: end;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: 50%;
+  background: var(--orange);
+  color: var(--on-primary);
+  font: inherit;
+  font-size: var(--fs-sm);
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 3px 8px var(--pf-glow);
+}
+.pf-me:has(> img) {
+  background: transparent;
+}
+.pf-me img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  object-fit: cover;
+}
+.pf-me.is-on {
+  box-shadow: 0 0 0 3px var(--surface), 0 0 0 5px var(--orange);
+}
+
+/* ---------- Page heading ---------- */
+.pf-head {
+  display: block;
+  margin-bottom: 22px;
+}
+.pf-head h1 {
+  font-size: var(--fs-xl);
+  font-weight: 800;
+  line-height: 1.15;
+  color: var(--ink);
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.18);
+}
+[data-theme='dark'] .pf-head h1 {
+  text-shadow: none;
+}
+.pf-head p {
+  margin-top: 6px;
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+}
+.pf-muted {
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+}
+.pf .pf-sub {
+  font-size: var(--fs-base);
+  font-weight: 700;
+  margin: 32px 0 14px;
+}
+.pf .pf-head + .pf-sub {
+  margin-top: 8px;
+}
+.pf-sub + .pf-list {
+  gap: 16px;
+}
+
+/* ---------- Buttons ---------- */
+.pf-btn {
+  display: inline-flex; 
+  align-items: center; 
+  justify-content: center; 
+  gap: 6px;
+  min-height: 32px; 
+  padding: 0 16px; 
+  border-radius: 999px; 
+  border: 1px solid transparent;
+  font: inherit; 
+  font-weight: 700; 
+  font-size: var(--fs-sm); 
+  white-space: nowrap; 
+  cursor: pointer;
+  transition: transform 0.15s ease, filter 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+}
+.pf-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.pf-btn--primary { 
+  background: var(--orange); 
+  color: var(--on-primary); 
+  box-shadow: 0 4px 10px var(--pf-glow); 
+}
+.pf-btn--primary:hover:not(:disabled) {
+  background: var(--hover);
+}
+.pf-btn--soft { 
+  background: var(--orange-soft); 
+  color: var(--text); 
+  border-color: var(--pf-line); 
+}
+.pf-btn--soft:hover {
+  background: color-mix(in srgb, var(--orange-soft) 70%, var(--red-soft));
+}
+.pf-btn--ghost {
+  background: var(--surface);
+  color: var(--text);
+  border-color: var(--pf-line);
+}
+.pf-btn--ghost:hover {
+  background: var(--orange-soft, var(--orange-soft));
+}
+.pf-btn--reorder { 
+  background: var(--surface); 
+  color: var(--text); 
+  border-color: var(--border-strong); 
+  min-height: 32px; 
+  padding: 0 16px; 
+  font-weight: 600; 
+  font-size: var(--fs-sm); 
+}
+.pf-btn--reorder:hover {
+   background: var(--orange-soft, var(--orange-soft)); 
+   box-shadow: 0 3px 8px rgba(0, 0, 0, 0.18); 
+  }
+.pf-btn--outline { 
+  background: var(--surface); 
+  border-color: var(--border-strong); 
+  color: var(--text); 
+}
+.pf-btn--outline:hover:not(:disabled) { 
+  transform: translateY(-1px); 
+  filter: brightness(1.05); 
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.16); 
+}
+.pf-btn--sm { 
+  min-height: 32px; 
+  padding: 0 14px; 
+  font-size: var(--fs-sm); 
+}
+.pf-btn--danger { 
+  background: var(--bad-fg); 
+  color: var(--on-primary); 
+  border-color: var(--bad-fg); 
+}
+.pf-btn--danger:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--bad-fg) 85%, #000);
+}
+.pf-btn--dangerline {
+  background: var(--surface);
+  color: var(--bad-fg);
+  border-color: var(--bad-fg);
+}
+.pf-btn--dangerline:hover {
+  background: color-mix(in srgb, var(--bad-bg) 50%, var(--surface));
+}
+.pf-btn--wide {
+  width: 100%;
+  max-width: 250px;
+}
+.pf-link { 
+  background: none; 
+  border: 0; 
+  padding: 0; 
+  font: inherit; 
+  font-size: var(--fs-sm); 
+  font-weight: 700; 
+  color: var(--bad-fg); 
+  text-decoration: underline; 
+  cursor: pointer;
+ }
+
+.pf-back {
+  display: inline-flex; 
+  align-items: center; 
+  gap: 6px; 
+  margin-bottom: 12px; 
+  padding: 4px 0;
+  background: none; 
+  border: 0; 
+  font: inherit; 
+  font-size: var(--fs-sm); 
+  font-weight: 700; 
+  color: var(--text); 
+  cursor: pointer;
+}
+.pf-back:hover {
+  color: var(--hover);
+}
+
+/* ---------- Photos (orange placeholders) ---------- */
+.pf-photo { 
+  display: block; 
+  flex-shrink: 0; 
+  background: var(--orange); 
+  object-fit: cover; }
+.pf-photo--avatar { 
+  width: 112px; 
+  height: 112px; 
+  border-radius: 50%; 
+}
+.pf-photo--thumb { 
+  width: 56px; 
+  height: 56px; 
+  border-radius: 12px; 
+}
+.pf-photo--cover { 
+  width: 100%; 
+  height: 150px; 
+  background: var(--red-soft); 
+}
+
+/* Change / Remove photo menu (same as the dashboard) */
+.pf-photobtn {
+  position: relative;
+}
+.pf-popover {
+  position: absolute; 
+  top: calc(100% + 8px); 
+  left: 50%; 
+  transform: translateX(-50%); 
+  z-index: 20;
+  min-width: 180px; 
+  padding: 6px;
+  border: 1px solid var(--border-strong, var(--pf-line)); 
+  border-radius: 16px;
+  background: var(--surface); 
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.18);
+}
+.pf-popover__item {
+  display: block; 
+  width: 100%; 
+  padding: 10px 14px; 
+  border: 0; 
+  border-radius: 12px; 
+  background: none;
+  color: var(--text); 
+  font: inherit; 
+  font-size: var(--fs-in); 
+  font-weight: 700; 
+  text-align: left; 
+  cursor: pointer;
+}
+.pf-popover__item:hover, .pf-popover__item:focus-visible {
+  background: var(--orange-soft);
+  outline: none;
+}
+
+/* ---------- Cards ---------- */
+.pf-card { 
+  background: var(--bg); 
+  border: 1px solid var(--border-strong); 
+  border-radius: 22px; 
+  padding: 18px 20px 20px; 
+  box-shadow: var(--shadow-md); 
+}
+.pf .pf-card__title { 
+  margin-bottom: 14px; 
+  font-size: var(--fs-base); 
+  font-weight: 700; }
+
+.pf-edit__fields .pf-card__title, 
+.pf-accounts .pf-card__title {
+  margin-bottom: 0;
+}
+.pf-msg { 
+  font-size: var(--fs-sm); 
+  font-weight: 600; 
+  color: var(--reject); }
+.pf-msg--ok {
+  color: var(--ready-fg);
+}
+
+/* ---------- Profile overview ---------- */
+.pf-profile { 
+  display: grid; 
+  grid-template-columns: minmax(260px, 330px) 1fr; 
+  gap: 16px; 
+  align-items: start; }
+.pf-identity { 
+  display: grid; 
+  justify-items: center; 
+  gap: 10px; 
+  padding: 24px 18px; 
+  text-align: center;
+ }
+.pf .pf-identity__name {
+  font-size: var(--fs-base);
+  font-weight: 700;
+  margin-top: 4px;
+  margin-bottom: -8px;
+}
+.pf-identity__mail {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: var(--fs-in);
+  color: var(--text-muted);
+}
+.pf-badge {
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--orange-soft);
+  color: var(--orange-dark);
+  font-size: var(--fs-in);
+  font-weight: 600;
+}
+
+.pf-side {
+  display: grid;
+  gap: 16px;
+}
+.pf .pf-details {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-top: 0;
+}
+.pf-details dt {
+  font-weight: 600;
+  font-size: var(--fs-sm);
+}
+.pf-details dd {
+  margin-top: 4px;
+  font-size: var(--fs-in);
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
+.pf-menu {
+  padding: 0;
+  overflow: hidden;
+}
+.pf-menu__row {
+  display: flex; align-items: center; gap: 14px; width: 100%; padding: 14px 20px; background: none; border: 0;
+  font: inherit; font-size: var(--fs-sm); font-weight: 600; color: var(--text); text-align: left; cursor: pointer;
+}
+.pf-menu__row + .pf-menu__row {
+  border-top: 1px solid var(--pf-line);
+}
+.pf-menu__row:hover {
+  background: var(--orange-soft);
+}
+.pf-menu__icon {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: var(--orange-soft);
+}
+
+/* ---------- Edit profile ---------- */
+.pf-edit {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  gap: 24px;
+  padding: 20px;
+}
+.pf-edit__photo {
+  display: grid;
+  justify-items: center;
+  align-content: start;
+  gap: 14px;
+}
+.pf-edit__fields {
+  display: grid;
+  gap: 14px;
+  align-content: start;
+}
+.pf-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+.pf-field {
+  display: grid;
+  gap: 6px;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}
+.pf-field input, .pf-reviewform textarea {
+  width: 100%; min-height: 40px; padding: 6px 14px; font: inherit; font-size: var(--fs-sm); font-weight: 400; color: var(--text);
+  background: var(--surface); border: 1px solid var(--pf-line); border-radius: var(--field-radius);
+}
+.pf-field input::placeholder, .pf-reviewform textarea::placeholder {
+  color: var(--text-muted);
+  opacity: 1;
+}
+.pf-field input:focus, .pf-reviewform textarea:focus {
+  border-color: var(--orange);
+  outline: none;
+  box-shadow: 0 0 0 3px var(--orange-soft);
+}
+.pf-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.pf-actions--left {
+  justify-content: flex-start;
+}
+
+/* Mobile number: fixed +63 prefix + number input (same as the dashboard) */
+.pf-phone {
+  display: flex; align-items: center; min-height: 40px; overflow: hidden;
+  background: var(--surface); border: 1px solid var(--pf-line); border-radius: var(--field-radius);
+}
+.pf-phone:focus-within {
+  border-color: var(--orange);
+  box-shadow: 0 0 0 3px var(--pf-ring);
+}
+.pf-phone.is-invalid {
+  border-color: var(--reject);
+}
+.pf-phone__prefix {
+  align-self: stretch; display: grid; place-items: center; padding: 0 10px 0 14px;
+  border-right: 1px solid var(--pf-line); background: var(--bg); color: var(--text); font-size: var(--fs-sm); font-weight: 600;
+}
+[data-theme='dark'] .pf-phone__prefix {
+  background: var(--orange-soft);
+}
+.pf-field .pf-phone input {
+  flex: 1;
+  min-width: 0;
+  min-height: 38px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.pf-field .pf-phone input:focus {
+  box-shadow: none;
+}
+
+/* ---------- Account settings ---------- */
+.pf-settings {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+.pf-pwform {
+  display: grid;
+  gap: 14px;
+  padding: 20px;
+}
+.pf-field-group {
+  display: grid;
+  gap: 8px;
+}
+.pf-pass {
+  position: relative;
+}
+.pf-pass input {
+  padding-right: 44px;
+}
+.pf-pass__eye {
+  position: absolute; top: 50%; right: 12px; transform: translateY(-50%); display: grid; place-items: center;
+  width: 28px; height: 28px; padding: 0; border: 0; border-radius: 50%; background: none; color: var(--text-muted); cursor: pointer;
+}
+.pf-pass__eye:hover {
+  color: var(--text);
+}
+.pf-meter {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+.pf-meter span {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--pf-line);
+}
+.pf-meter span.is-on {
+  background: var(--hover);
+}
+.pf-rules {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+.pf-rules li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--fs-sm);
+  color: var(--text);
+}
+.pf-rules__dot {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 12px;
+  height: 12px;
+  border: 1px solid var(--text-muted);
+  border-radius: 50%;
+  color: var(--on-primary);
+}
+.pf-rules li.is-ok .pf-rules__dot {
+  background: var(--hover);
+  border-color: var(--hover);
+}
+.pf-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+.pf-check input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--hover);
+}
+/* Security tips card removed */
+.pf-tips {
+  display: none;
+}
+.pf-tips ul {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 6px;
+  font-size: var(--fs-sm);
+  list-style: disc;
+}
+.pf-tips li {
+  display: list-item;
+  list-style: disc;
+}
+.pf-tips li::marker {
+  color: var(--text);
+}
+.pf .pf-danger .pf-card__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  color: var(--bad-fg);
+}
+.pf-danger .pf-muted {
+  margin-bottom: 14px;
+}
+/* Delete-account popup: white card, close button, red warning icon, password confirm */
+.pf-modal--white {
+  position: relative;
+  width: min(420px, 100%);
+  padding: 28px;
+  border-color: transparent;
+  border-radius: 28px;
+  background: var(--surface);
+}
+.pf-dialog__x {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--text);
+  cursor: pointer;
+}
+.pf-dialog__x:hover {
+  background: var(--orange-soft);
+}
+.pf-dialog__icon {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--bad-bg);
+  color: var(--bad-fg);
+}
+.pf .pf-dialog__title {
+  margin: 16px 0 8px;
+  font-size: var(--fs-lg);
+  font-weight: 800;
+}
+.pf-dialog__text {
+  margin: 0 0 16px;
+  font-size: var(--fs-sm);
+  line-height: 1.45;
+}
+.pf-modal--white .pf-field {
+  margin-bottom: 4px;
+}
+.pf-dialog__actions {
+  margin-top: 18px;
+}
+
+.pf-danger__confirm {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: var(--fs-sm);
+  font-weight: 700;
+}
+
+/* ---------- Connected accounts ---------- */
+.pf-accounts {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+  padding: 18px 24px;
+}
+.pf-connect {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 14px;
+  background: var(--surface);
+  border: 1px solid var(--pf-line);
+  border-radius: 14px;
+}
+.pf-connect__icon {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #1877f2;
+  color: var(--on-primary);
+}
+.pf-connect__name {
+  flex: 1;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}
+
+/* ---------- Panel: the rounded container around tabs + lists (same look as the dashboard) ---------- */
+.pf-panel {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 28px;
+  padding: 30px;
+  box-shadow: var(--shadow-md);
+}
+.pf-panel + .pf-panel {
+  margin-top: 20px;
+}
+.pf .pf-panel > .pf-sub:first-child {
+  margin-top: 0;
+}
+
+/* ---------- Tabs (same size as the dashboard pills) ---------- */
+.pf-tabs {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 10px;
+  padding: 12px 14px 14px;
+  margin: -12px -14px 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.pf-tabs::-webkit-scrollbar {
+  display: none;
+}
+.pf-tab {
+  flex-shrink: 0; display: inline-flex; align-items: center; min-height: 30px; padding: 4px 18px;
+  border-radius: 999px; border: 1px solid color-mix(in srgb, var(--red-soft) 80%, #fff); background: var(--orange-soft, var(--orange-soft));
+  color: var(--ink, var(--text)); font: inherit; font-size: var(--fs-sm); font-weight: 700; cursor: pointer;
+  box-shadow: 0 0 8px rgba(0, 0, 0, 0.12);   /* even, round shadow */
+}
+.pf-tab.is-on {   background: #F4B8AC;
+  border-color: #e36b67;
+  color:var(--danger);
+  box-shadow: 0 4px 8px #F4B8AC; }   /* even, round glow */
+[data-theme='dark'] .pf-tab {
+  background: var(--surface);
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+[data-theme='dark'] .pf-tab.is-on {
+  background: var(--orange-dark);
+  border-color: var(--orange-dark);
+  color: var(--on-primary);
+  box-shadow: none;
+}
+
+/* ---------- Orders & reviews ---------- */
+.pf-list, .pf-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 14px;
+}
+.pf-row-card {
+  display: flex; align-items: center; gap: 16px; padding: 8px 14px 8px 8px;
+  background: var(--surface); border: 1px solid var(--border-strong); border-radius: 14px; box-shadow: 0 3px 8px rgba(0, 0, 0, 0.1);
+}
+[data-theme='dark'] .pf-row-card {
+  border-color: var(--border-strong);
+}
+.pf-order__main, .pf-review__main {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+.pf-order__main h3, .pf-review__main h3 {
+  font-size: var(--fs-sm);
+  font-weight: 700;
+}
+.pf-order__main .pf-muted {
+  font-size: var(--fs-sm);
+}
+.pf-order__items {
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+}
+.pf-order__items b {
+  color: var(--orange-dark);
+  font-weight: 800;
+}
+.pf-order__total {
+  font-size: var(--fs-sm);
+  font-weight: 800;
+  color: var(--text);
+  white-space: nowrap;
+}
+.pf-order__actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.pf-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 18px;
+  border-radius: 999px;
+  font-size: var(--fs-in);
+  font-weight: 600;
+  border: 1px solid;
+}
+.pf-pill--sm {
+  padding: 1px 10px;
+  font-size: var(--fs-in);
+  font-weight: 700;
+}
+.pf-pill--ok {
+  background: var(--ready-bg);
+  color: var(--ready-fg, var(--ready-fg));
+  border-color: var(--ready-line);
+}
+.pf-pill--bad {
+  background: var(--bad-bg);
+  color: var(--bad-fg);
+  border-color: var(--red-soft);
+}
+.pf-pill--open {
+  background: var(--yellow);
+  color: var(--ink);
+  border-color: var(--yellow-bright);
+}
+/* Order statuses: same colours as OrderStatus.css */
+.pf-pill--pending {
+  color: #8a5a00;
+  background: #fdf0c9;
+  border-color: #f1d9a0;
+}
+.pf-pill--accepted {
+  color: #2a5ea8;
+  background: #e6f0fb;
+  border-color: #c7dbf3;
+}
+.pf-pill--ready,
+.pf-pill--completed {
+  color: #1f7a3d;
+  background: #e3f6ea;
+  border-color: #b7e3c6;
+}
+
+.pf-review--pending {
+  padding: 10px 14px 10px 8px;
+  flex-wrap: wrap;
+}
+.pf-review--pending h3 {
+  font-size: var(--fs-base);
+}
+.pf-review--pending .pf-muted {
+  color: var(--text);
+  font-weight: 600;
+  font-size: var(--fs-sm);
+}
+.pf-review:not(.pf-review--pending) {
+  align-items: flex-start;
+  padding: 10px 14px 12px 10px;
+}
+.pf-review__main {
+  min-width: 180px;
+}
+.pf-review__main p {
+  font-size: var(--fs-sm);
+}
+.pf-review__head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: center;
+}
+.pf-review__meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex: none;
+}
+.pf-review:not(.pf-review--pending) .pf-review__head .pf-muted {
+  font-size: var(--fs-sm);
+}
+.pf-stars {
+  display: inline-flex;
+  gap: 2px;
+  color: var(--yellow);
+} /* stars (= dashboard rating star) */
+.pf-stars button {
+  background: none;
+  border: 0;
+  padding: 2px;
+  color: inherit;
+  cursor: pointer;
+}
+.pf-reviewform {
+  display: grid;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+/* "Write a review" popup */
+.pf-reviewform--write {
+  gap: 12px;
+  margin-top: 0;
+}
+.pf-reviewform--write textarea {
+  min-height: 96px;
+  padding: 12px 14px;
+  border-radius: var(--field-radius);
+  resize: vertical;
+}
+.pf-reviewform--write .pf-actions {
+  gap: 10px;
+}
+
+.pf-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(30, 15, 8, 0.5);
+}
+.pf-modal {
+  width: min(500px, 100%); max-height: calc(100dvh - 40px); overflow-y: auto; padding: 22px 24px;
+  border: 1px solid var(--border-strong); border-radius: 28px; background: var(--bg); color: var(--text);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35);
+}
+.pf .pf-modal__title {
+  margin: 0 0 16px;
+  font-size: var(--fs-base);
+  font-weight: 700;
+}
+.pf-modal__top {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+.pf-photo--modal {
+  width: 72px;
+  height: 72px;
+  border-radius: 16px;
+}
+.pf-modal__who {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+.pf-modal__who h3 {
+  font-size: var(--fs-base);
+  font-weight: 700;
+}
+.pf-modal__who p {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+/* ---------- Favorites (cards come from VendorCard.css) ---------- */
+.pf-grid {
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px;
+}
+.pf-grid > li {
+  display: flex;
+}
+.pf-grid > li > .vcard {
+  width: 100%;
+}
+
+/* ---------- Phones ---------- */
+@media (max-width: 720px) {
+  /* Fill the whole screen so wrapper padding in the app layout can't leave blank bands above or below */
+  .pf {
+    position: fixed;
+    inset: 0;
+    z-index: 20;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    min-height: 0;
+    background: var(--bg);
+  }
+
+  /* Header: brand + avatar on top, nav pill underneath (same as the dashboard) */
+  .pf-header {
+    grid-template-columns: 1fr auto;
+    grid-template-areas: 'logo me' 'nav nav';
+    row-gap: 8px;
+    min-height: 0;
+    padding-top: max(8px, env(safe-area-inset-top, 0px));
+    padding-bottom: 8px;
+  }
+  .pf-logo {
+    grid-area: logo;
+  }
+  .pf-me {
+    grid-area: me;
+  }
+  .pf-nav {
+    grid-area: nav;
+    display: flex;
+    width: 100%;
+  }
+  .pf-nav__item {
+    flex: 1;
+    padding: 0 8px;
+  }
+
+  .pf-page {
+    padding-top: 8px;
+    padding-bottom: max(12px, env(safe-area-inset-bottom, 0px));
+  }
+  .pf-head {
+    margin-bottom: 12px;
+  }
+  .pf-card {
+    padding: 16px;
+    border-radius: 20px;
+  }
+  .pf-panel {
+    padding: 16px;
+    border-radius: 20px;
+  }
+  .pf-profile, .pf-edit, .pf-settings {
+    grid-template-columns: 1fr;
+  }
+  .pf-edit {
+    padding: 16px;
+    gap: 16px;
+  }
+  .pf-row, .pf-details {
+    grid-template-columns: 1fr;
+  }
+  .pf-tabs {
+    margin-bottom: 2px;
+  }
+  .pf-accounts {
+    padding: 16px 18px;
+  }
+  .pf-grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* Order cards: thumb | info | price on the first line, status + Reorder on their own row */
+  .pf-order {
+    display: grid;
+    grid-template-columns: 56px minmax(0, 1fr) auto;
+    column-gap: 10px;
+    row-gap: 8px;
+    align-items: start;
+    padding: 10px 12px 12px 10px;
+  }
+  .pf-order__total {
+    align-self: start;
+    line-height: 1.4;
+  }
+  /* status + Reorder: two equal-width buttons under the order info */
+  .pf-order__actions {
+    grid-column: 2 / -1;
+    gap: 10px;
+  }
+  .pf-order__actions > * {
+    flex: 1 1 0;
+    min-width: 0;
+    justify-content: center;
+    min-height: 32px;
+    text-align: center;
+  }
+
+  /* Review cards */
+  .pf-review--pending > .pf-btn {
+    flex: 1 1 100%;
+  }
+  .pf .pf-sub {
+    margin: 24px 0 12px;
+  }
+  .pf .pf-head + .pf-sub {
+    margin-top: 4px;
+  }
+  .pf-modal {
+    padding: 18px;
+    border-radius: 24px;
+  }
+}
+
+@media (max-width: 480px) {
+  .pf-logo__text {
+    display: none;
+  } /* logo only */
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pf-btn, .pf-nav__item {
+    transition: none;
+  }
+}
+
+
+/* ---- animations ----- */
+
+/* ---------- Buttons ---------- */
+.pf-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+.pf-btn:active:not(:disabled) {
+  transform: translateY(0) scale(0.96);
+  filter: brightness(0.97);
+  box-shadow: none;
+}
+.pf-btn--primary:hover:not(:disabled) {
+  box-shadow: 0 6px 14px var(--pf-glow);
+}
+.pf-btn--soft:hover:not(:disabled),
+.pf-btn--ghost:hover:not(:disabled) {
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.14);
+}
+
+/* ---------- Header: logo, nav tabs, avatar ---------- */
+
+.pf-nav__item {
+  transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease;
+}
+.pf-nav__item:active {
+  transform: scale(0.96);
+}
+.pf-nav__item svg {
+  transition: transform 0.25s ease;
+}
+.pf-nav__item:hover svg {
+  transform: translateY(-2px) scale(1.12);
+}
+.pf-nav__item.is-on:hover svg {
+  transform: scale(1.08);
+}
+.pf-nav__item.is-on {
+  animation: pf-settle 0.3s ease-out;
+}
+
+.pf-me {
+  transition: transform 0.15s ease, box-shadow 0.2s ease;
+}
+.pf-me:hover {
+  transform: scale(1.07);
+}
+.pf-me:active {
+  transform: scale(0.93);
+}
+
+@keyframes pf-settle {
+  0% {
+    transform: scale(0.94);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* ---------- Back link: arrow nudges left ---------- */
+.pf-back {
+  transition: color 0.2s ease, transform 0.15s ease;
+}
+.pf-back svg {
+  transition: transform 0.2s ease;
+}
+.pf-back:hover svg {
+  transform: translateX(-3px);
+}
+.pf-back:active {
+  transform: scale(0.96);
+}
+
+/* ---------- Tabs (My Orders / Favorites / Reviews ...) ---------- */
+.pf-tab {
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease,
+    box-shadow 0.2s ease, transform 0.15s ease;
+}
+.pf-tab:hover:not(.is-on) {
+  border-color: var(--orange);
+}
+.pf-tab:active {
+  transform: scale(0.96);
+}
+.pf-tab.is-on {
+  animation: pf-settle 0.3s ease-out;
+}
+
+/* ---------- Menu rows (Account settings / Log out) ---------- */
+.pf-menu__row {
+  transition: background-color 0.2s ease, padding-left 0.2s ease;
+}
+.pf-menu__row:hover {
+  padding-left: 24px;
+}
+.pf-menu__row:active {
+  background: var(--orange-soft);
+}
+.pf-menu__icon {
+  transition: transform 0.2s ease;
+}
+.pf-menu__row:hover .pf-menu__icon {
+  transform: scale(1.1) rotate(-6deg);
+}
+
+/* ---------- Order / review cards ---------- */
+.pf-row-card {
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+.pf-row-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.12);
+}
+.pf-row-card:active {
+  transform: translateY(0);
+}
+
+/* ---------- Photo menu, dialog close, password eye, text links ---------- */
+.pf-popover {
+  animation: pf-drop 0.18s ease-out;
+}
+@keyframes pf-drop {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+.pf-popover__item {
+  transition: background-color 0.15s ease, transform 0.15s ease;
+}
+.pf-popover__item:active {
+  transform: scale(0.98);
+}
+
+.pf-dialog__x {
+  transition: background-color 0.2s ease, transform 0.25s ease;
+}
+.pf-dialog__x:hover {
+  transform: rotate(90deg);
+}
+.pf-dialog__x:active {
+  transform: rotate(90deg) scale(0.9);
+}
+
+.pf-pass__eye {
+  transition: color 0.2s ease, transform 0.15s ease;
+}
+.pf-pass__eye:hover {
+  transform: translateY(-50%) scale(1.12);
+}
+.pf-pass__eye:active {
+  transform: translateY(-50%) scale(0.9);
+}
+
+.pf-link {
+  transition: opacity 0.2s ease, transform 0.15s ease;
+}
+.pf-link:hover {
+  transform: translateY(-1px);
+}
+.pf-link:active {
+  transform: scale(0.95);
+}
+
+/* ---------- Review stars ---------- */
+.pf-stars button {
+  transition: transform 0.15s ease;
+}
+.pf-stars button:hover {
+  transform: scale(1.25) rotate(-8deg);
+}
+.pf-stars button:active {
+  transform: scale(0.9);
+}
+
+/* ---------- Inputs and phone field ---------- */
+.pf-field input, .pf-reviewform textarea, .pf-phone {
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+/* ---------- Pop-ups (write a review / delete account) ---------- */
+.pf-overlay {
+  animation: pf-fade 0.18s ease;
+}
+.pf-modal {
+  animation: pf-pop 0.22s ease;
+}
+@keyframes pf-fade {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes pf-pop {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+}
+
+/* ---------- Phones: no hover lift on touch ---------- */
+@media (max-width: 720px) {
+  .pf-row-card:hover {
+    transform: none;
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.1);
+  }
+  .pf-menu__row:hover {
+    padding-left: 20px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pf *, .pf-overlay, .pf-modal, .pf-popover {
+    animation: none !important;
+    transition: none !important;
+  }
+  .pf *:hover, .pf *:active {
+    transform: none !important;
+  }
+  .pf-popover {
+    transform: translateX(-50%) !important;
+  }
+  .pf-pass__eye {
+    transform: translateY(-50%) !important;
+  }
+}

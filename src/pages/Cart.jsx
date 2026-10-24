@@ -2,18 +2,31 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import Icon from '../components/Icon'
 import { useCart } from '../context/CartContext'
-import { getVendor } from '../data/vendors'
+import { useVendors } from '../context/VendorContext'
+import { useAuth } from '../context/AuthContext'
 import './Cart.css'
+
+const Peso = ({ value }) => (
+  <span className="price">
+    <Icon name="peso" className="price__icon" />
+    <span className="price__num">{Number(value || 0).toLocaleString('en-PH')}</span>
+  </span>
+)
+
 
 export default function Cart() {
   const { lines, count, total, setQty, vendorId, clearCart } = useCart()
   const navigate = useNavigate()
+  const { getVendor } = useVendors() // live store data (edited from the vendor dashboard)
   const vendor = vendorId ? getVendor(vendorId) : null
-  const [pickupName, setPickupName] = useState('')
+  const { user } = useAuth()
+  const [pickupName, setPickupName] = useState(user?.role === 'Student' ? user.name ?? '' : '')
   const [note, setNote] = useState('')
+  const closed = vendor ? !vendor.isOpen || !vendor.preorderEnabled : false
 
   const placeOrder = (e) => {
     e.preventDefault()
+    if (closed) return
     // Simulate order creation — in production this hits the C# backend.
     const orderId = `FH-${Math.floor(1000 + Math.random() * 9000)}`
     const order = {
@@ -26,7 +39,11 @@ export default function Cart() {
       total,
       placedAt: new Date().toISOString(),
     }
-    sessionStorage.setItem(`order-${orderId}`, JSON.stringify(order))
+    try {
+      sessionStorage.setItem(`order-${orderId}`, JSON.stringify(order))
+    } catch {
+      // storage blocked (private mode / full): the order page will say it can't find the order
+    }
     clearCart()
     navigate(`/order/${orderId}`)
   }
@@ -35,14 +52,19 @@ export default function Cart() {
     return (
       <div className="container section">
         <div className="cart-empty">
-          <span className="cart-empty__emoji" aria-hidden="true">🛒</span>
-          <h1>Your cart is empty</h1>
+          <span className="cart-empty__emoji" aria-hidden="true">
+            <img src="/images/cart1.png" alt=""
+              aria-hidden="true"
+              onError={(e) => {
+                e.currentTarget.style.display = 'none'
+              }}/>
+          </span>
+          <h1 className = "cart-title">Empty Cart</h1>
           <p className="text-muted">
-            Browse campus vendors and add items from a store that accepts
-            pre-orders.
+            Explore campus vendors and add your favorite meals to your cart.
           </p>
           <Link to="/" className="btn btn--primary mt-4">
-            Discover vendors
+            Explore Food
           </Link>
         </div>
       </div>
@@ -55,7 +77,7 @@ export default function Cart() {
         <Icon name="back" size={18} /> Back to {vendor?.name ?? 'store'}
       </Link>
 
-      <h1 className="cart-title">Review your pre-order</h1>
+      <h1 className="cart-title">Review Your Order</h1>
       {vendor && (
         <p className="text-muted cart-vendor">
           <Icon name="store" size={16} /> {vendor.name} · {vendor.locationArea}
@@ -63,24 +85,37 @@ export default function Cart() {
       )}
 
       <div className="cart-grid">
-        <section aria-label="Order items">
+        <section aria-label="Order items" className="cart-panel">
           <ul className="cart-lines">
             {lines.map(({ item, qty }) => (
               <li key={item.id} className="cart-line card">
+                  <div className="cart-line__thumb" aria-hidden="true">
+                   {item.image && (
+                   <img
+                   src={item.image}
+                   alt=""
+                   onError={(e) => { e.currentTarget.style.display = 'none' }}
+                   />
+                  )}
+                  </div>
                 <div className="cart-line__info">
                   <p className="cart-line__name">{item.name}</p>
-                  <p className="cart-line__price">₱{item.price} each</p>
+                  <p className="cart-line__desc">{item.desc ?? 'Item Description/Details.'}</p>
+                  <p className="cart-line__price"><Peso value={item.price} /></p>
+                  
                 </div>
                 <div className="stepper" role="group" aria-label={`Quantity of ${item.name}`}>
                   <button
-                    className="stepper__btn"
-                    onClick={() => setQty(item.id, qty - 1)}
-                    aria-label={`Remove one ${item.name}`}
+                    type="button"
+                     className="stepper__btn"
+                     onClick={() => setQty(item.id, qty - 1)}
+                    aria-label={qty === 1 ? `Remove ${item.name} from cart` : `Remove one ${item.name}`}
                   >
-                    <Icon name="minus" size={16} />
-                  </button>
+                 <Icon name={qty === 1 ? 'trash' : 'minus'} size={16} />
+                </button>
                   <span className="stepper__count">{qty}</span>
                   <button
+                    type="button"
                     className="stepper__btn"
                     onClick={() => setQty(item.id, qty + 1)}
                     aria-label={`Add one ${item.name}`}
@@ -88,18 +123,26 @@ export default function Cart() {
                     <Icon name="plus" size={16} />
                   </button>
                 </div>
-                <span className="cart-line__amt">₱{item.price * qty}</span>
               </li>
             ))}
           </ul>
+
+          <div className="cart-actions">  
+          <Link to={vendor ? `/vendor/${vendor.id}` : '/'} className="cart-add">
+          <span aria-hidden="true">+</span> Add more items
+          </Link>
+         <button type="button" className="cart-clear" onClick={clearCart}>
+          Clear Cart
+        </button>
+        </div>
         </section>
 
         <aside>
           <form className="checkout card" onSubmit={placeOrder}>
-            <h2 className="checkout__title">Pickup details</h2>
+            <h2 className="checkout__title">Pickup Information</h2>
 
             <div className="field">
-              <label htmlFor="pickup-name">Your name</label>
+              <label htmlFor="pickup-name">Your Name (Required) </label>
               <input
                 id="pickup-name"
                 className="input"
@@ -111,7 +154,7 @@ export default function Cart() {
             </div>
 
             <div className="field">
-              <label htmlFor="note">Note for vendor (optional)</label>
+              <label htmlFor="note">Special Instructions (Optional)</label>
               <textarea
                 id="note"
                 className="textarea"
@@ -122,26 +165,32 @@ export default function Cart() {
             </div>
 
             <div className="checkout__summary">
-              <div className="checkout__row">
+              <div className="checkout__row ">
                 <span>Items ({count})</span>
-                <span>₱{total}</span>
+                <span><Peso value={total} /></span>
               </div>
-              <div className="checkout__row checkout__row--total">
-                <span>Total due on pickup</span>
-                <strong>₱{total}</strong>
+              <div className="checkout__row checkout__row--total ">
+                <span>TOTAL</span>
+                 <strong><Peso value={total} /></strong>
               </div>
             </div>
 
             <div className="checkout__pay">
               <Icon name="check" size={18} className="checkout__pay-icon" />
-              <span>Cash on pickup — no online payment needed</span>
+              <span>Pay cash upon pickup at the counter</span>
             </div>
 
-            <button type="submit" className="btn btn--primary btn--block">
-              Place pre-order
+            {closed && (
+              <p className="checkout__closed" role="alert">
+                {vendor.name} isn't taking pre-orders right now. Open hours: {vendor.hoursOpen}–{vendor.hoursClose}.
+              </p>
+            )}
+
+            <button type="submit" className="btn btn--primary btn--block" disabled={closed}>
+              Confirm Pre-Order
             </button>
             <p className="checkout__fine">
-              This reserves your order. Pickup only, no delivery.
+              This reserves your order for pickup only.
             </p>
           </form>
         </aside>

@@ -6,9 +6,10 @@
 
 :root {
   /* ---- Brand oranges (the 2 shades) ---- */
-  --orange: #F2622E;          /* primary orange — CTAs, brand */
-  --orange-dark: #D94A18;     /* second shade — hover/pressed, depth */
-  --orange-soft: #FFE7DA;     /* tinted orange surface */
+  --orange: #ED6728;          /* primary orange — CTAs, brand */
+  --orange-dark: #E1473B;     /* second shade — hover/pressed, depth */
+  --orange-soft: #FFE8E4; 
+  --red-soft: #FAA29C;    /* tinted orange surface */
 
   /* ---- Yellows (a few) ---- */
   --yellow: #FFC72C;          /* highlight / accent */
@@ -23,12 +24,13 @@
   --border: #F0E6DC;          /* hairline borders */
   --border-strong: #E6D7C8;
 
-  --ink: #2B2622;             /* body text — warm near-black */
+  --ink: #3B2A22;             /* body text — warm near-black */
   --ink-soft: #6B6158;        /* secondary text */
   --ink-faint: #9A8F84;       /* tertiary / placeholders */
 
   --success: #2E8B57;
   --danger: #D94A18;
+  --hover: #D94A18; /* button hovers*/
 
   /* ---- Semantic roles ---- */
   --bg: var(--cream);
@@ -45,21 +47,58 @@
   --footer-bg: #2B2622;
   --footer-text: #FFF4E8;
 
-  /* ---- Spacing scale (4/8 rhythm) ---- */
-  --space-1: 0.25rem;
-  --space-2: 0.5rem;
-  --space-3: 0.75rem;
-  --space-4: 1rem;
-  --space-5: 1.5rem;
-  --space-6: 2rem;
-  --space-7: 3rem;
-  --space-8: 4rem;
+  /* ============================================================
+     Vendor dashboard tokens (order status + layout only;
+     other dashboard colors live in Dashboard.css)
+     ============================================================ */
+
+  /* ---- Order status: badge + pill colors (bg / fg / line) ---- */
+  --pending-bg: #fdebc8;
+  --pending-fg: #b45f06;
+  --pending-line: #f0c27b;
+  --preparing-bg: #dceefc;
+  --preparing-fg: #1d6fb8;
+  --preparing-line: #9ccbf0;
+  --ready-bg: #ddf5e3;
+  --ready-fg: #1e7a44;
+  --ready-line: #8ad1a3;
+  --done-bg: #efefef;
+  --done-fg: #5a5a5a;
+  --done-line: #bdbdbd;
+  --bad-bg: #fde2e1;              /* canceled / rejected badge */
+  --bad-fg: #a62a2a;
+
+  /* ---- Order status: count bubble inside status pills ---- */
+  --pending-count: #d97706;
+  --preparing-count: #0b7fc4;
+  --ready-count: #1e8e4e;
+  --done-count: #6b6b6b;
+
+  /* ---- Order action buttons (Accept / Mark Ready / Handed Over / Reject) ---- */
+  --accept: #D97706;
+  --accept-hover: #B45309;
+  --preparing-action: #0b7fc4;
+  --preparing-action-hover: #0a6ba6;
+  --ready-action: #1e8e4e;
+  --ready-action-hover: #167a41;
+  --reject: #DC2626;              /* reject hover + "late" order time */
+
+/* ---- Spacing scale (4/8 rhythm) ---- */
+--space-1: 0.25rem; /* 4px */
+--space-2: 0.5rem;  /* 8px */
+--space-3: 0.75rem; /* 12px */
+--space-4: 1rem;    /* 16px */
+--space-5: 1.5rem;  /* 24px */
+--space-6: 2rem;    /* 32px */
+--space-7: 3rem;    /* 48px */
+--space-8: 4rem;    /* 64px */
 
   /* ---- Radii ---- */
   --radius-sm: 8px;
   --radius-md: 14px;
   --radius-lg: 22px;
   --radius-pill: 999px;
+  --field-radius: 14px;       /* dashboard inputs + phone field */
 
   /* ---- Shadows ---- */
   --shadow-sm: 0 1px 2px rgba(43, 38, 34, 0.06);
@@ -67,23 +106,22 @@
   --shadow-lg: 0 16px 40px rgba(217, 74, 24, 0.12);
 
   /* ---- Typography ---- */
-  --font-sans: "Nunito", "Segoe UI", system-ui, -apple-system, sans-serif;
-  --font-display: "Poppins", "Nunito", "Segoe UI", system-ui, sans-serif;
-
-  --fs-xs: 0.75rem;
-  --fs-sm: 0.875rem;
-  --fs-base: 1rem;
-  --fs-lg: 1.125rem;
-  --fs-xl: 1.375rem;
-  --fs-2xl: 1.75rem;
-  --fs-3xl: 2.25rem;
-  --fs-4xl: clamp(2.25rem, 6vw, 3.5rem);
+  --font-brand: "Metropolis", "Nunito", "Segoe UI", system-ui, sans-serif;
+  
+--fs-xs: 0.5rem;    /* 8px */
+--fs-in: 0.60rem;  
+--fs-sm: 0.75rem;   /* 12px */
+--fs-base: 1rem;    /* 16px */
+--fs-lg: 1.25rem;   /* 20px */
+--fs-xl: 1.5rem;    /* 24px */
+--fs-2xl: 1.875rem; /* 30px */
+--fs-3xl: 2.25rem;  /* 36px */
 
   /* ---- Layout ---- */
   --container: 1180px;
-  --header-h: 68px;
+  --header-h: 56px;
+  --top-h: 72px;              /* dashboard top bar height */
   --transition: 180ms ease;
-
   color-scheme: light;
 }
 
@@ -115,6 +153,20 @@
   --header-bg: rgba(26, 21, 18, 0.9);
   --footer-bg: #141009;
   --footer-text: #FFF4E8;
+
+  /* ---- Vendor dashboard: order status (dark) ---- */
+  --pending-bg: #4a3a0c;
+  --pending-fg: #ffd66b;
+  --preparing-bg: #1b2f55;
+  --preparing-fg: #a9c8ff;
+  --ready-bg: #17402b;
+  --ready-fg: #8fe0b0;
+  --bad-bg: #4a1f1f;
+  --bad-fg: #ffb4b0;
+  --done-bg: #3a3a3a;
+  --done-fg: #e0e0e0;
+  --done-line: #6a6a6a;
+  --reject: #FCA5A5;
 
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
   --shadow-md: 0 6px 18px rgba(0, 0, 0, 0.45);

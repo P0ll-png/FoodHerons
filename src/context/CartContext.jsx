@@ -1,49 +1,66 @@
-import { createContext, useContext, useMemo, useState } from 'react'
+import { createContext, useCallback, useContext, useMemo, useReducer } from 'react'
+import { useVendors } from './VendorContext'
 
 const CartContext = createContext()
 
 // Cart is scoped to a single vendor at a time (pre-orders are per vendor).
-export function CartProvider({ children }) {
-  const [vendorId, setVendorId] = useState(null)
-  const [items, setItems] = useState({}) // { menuItemId: { item, qty } }
+// The cart only remembers item IDs and quantities. Names, prices and images
+// are looked up from VendorContext every time, so when the vendor edits an
+// item in the dashboard the cart updates automatically.
+//
+// The vendor and the quantities live in ONE reducer state so that "which
+// vendor is this cart for?" and "what is in it?" always change together.
+// (With two separate states, two quick clicks after switching vendors could
+// each start from an empty cart and one item would be lost.)
+const EMPTY_CART = { vendorId: null, qtys: {} } // qtys: { menuItemId: quantity }
 
-  const addItem = (vId, item) => {
-    setItems((prev) => {
-      // Switching vendors clears the previous cart.
-      const base = vId === vendorId ? prev : {}
-      const existing = base[item.id]
+function cartReducer(state, action) {
+  switch (action.type) {
+    // Add one of an item. Adding from a different vendor starts a fresh cart.
+    case 'add': {
+      const base = action.vendorId === state.vendorId ? state.qtys : {}
       return {
-        ...base,
-        [item.id]: { item, qty: existing ? existing.qty + 1 : 1 },
+        vendorId: action.vendorId,
+        qtys: { ...base, [action.itemId]: (base[action.itemId] ?? 0) + 1 },
       }
-    })
-    setVendorId(vId)
-  }
-
-  const setQty = (itemId, qty) => {
-    setItems((prev) => {
-      if (qty <= 0) {
-        const next = { ...prev }
-        delete next[itemId]
-        return next
+    }
+    // Set an exact quantity (0 or less removes the item).
+    case 'set': {
+      if (action.qty <= 0) {
+        const { [action.itemId]: removed, ...rest } = state.qtys
+        return { ...state, qtys: rest }
       }
-      return { ...prev, [itemId]: { ...prev[itemId], qty } }
-    })
+      return { ...state, qtys: { ...state.qtys, [action.itemId]: action.qty } }
+    }
+    case 'clear':
+      return EMPTY_CART
+    default:
+      return state
   }
+}
 
-  const clearCart = () => {
-    setItems({})
-    setVendorId(null)
-  }
+export function CartProvider({ children }) {
+  const { getVendor } = useVendors()
+  const [{ vendorId, qtys }, dispatch] = useReducer(cartReducer, EMPTY_CART)
 
-  const { count, total, lines } = useMemo(() => {
-    const lines = Object.values(items)
+  const addItem = useCallback((vId, item) => dispatch({ type: 'add', vendorId: vId, itemId: item.id }), [])
+  const setQty = useCallback((itemId, qty) => dispatch({ type: 'set', itemId, qty }), [])
+  const clearCart = useCallback(() => dispatch({ type: 'clear' }), [])
+
+  // Build the live cart: current item data + quantity.
+  // Items the vendor deleted or marked sold out are left out automatically.
+  const { items, lines, count, total } = useMemo(() => {
+    const menu = (vendorId ? getVendor(vendorId)?.menu : null) ?? []
+    const lines = Object.entries(qtys)
+      .map(([id, qty]) => ({ item: menu.find((m) => m.id === id), qty }))
+      .filter((l) => l.item && l.item.available)
     return {
       lines,
+      items: Object.fromEntries(lines.map((l) => [l.item.id, l])), // { id: { item, qty } }
       count: lines.reduce((n, l) => n + l.qty, 0),
       total: lines.reduce((n, l) => n + l.qty * l.item.price, 0),
     }
-  }, [items])
+  }, [qtys, vendorId, getVendor])
 
   return (
     <CartContext.Provider

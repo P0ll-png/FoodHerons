@@ -1,64 +1,59 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import './auth.css'
+import { useAuth } from '../context/AuthContext'
+import AuthLayout, { PasswordField, AuthDivider, AuthTerms, FacebookButton } from '../components/AuthLayout'
 
 export default function Login() {
   const navigate = useNavigate()
+  const { login } = useAuth()
   const [form, setForm] = useState({ email: '', password: '' })
 
   const submit = (e) => {
     e.preventDefault()
-    // Frontend-only demo: no real auth. Route to dashboard.
-    navigate('/dashboard')
+    // no real auth. Sign the student in so the header shows their profile.
+    const name = form.email.split('@')[0].replace(/[._-]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+    login({ name: name || 'Student', email: form.email, role: 'Student' })
+    navigate('/')
+  }
+
+  //replace with real Facebook Login 
+  const loginWithFacebook = () => {
+    login({ name: 'Student', email: '', role: 'Student' })
+    navigate('/')
   }
 
   const update = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
 
   return (
-    <div className="auth">
-      <div className="auth__card">
-        <span className="auth__logo" aria-hidden="true">
-          <img src="/logo.png" alt="" onError={(e) => (e.currentTarget.style.display = 'none')} />
-        </span>
-        <h1 className="auth__title">Welcome back</h1>
-        <p className="auth__sub">Log in to order or manage your store.</p>
+    <AuthLayout
+      variant="login"
+      title="Welcome Back!"
+      message="Log in to order or manage your store."
+    >
+      <form className="auth__form" onSubmit={submit}>
+        <div className="field">
+          <label htmlFor="email">Email</label>
+          <input id="email" type="email" className="input" placeholder="Enter your email (you@umak.edu.ph)"
+            value={form.email} onChange={update('email')} autoComplete="email" required />
+        </div>
 
-        <form onSubmit={submit}>
-          <div className="field">
-            <label htmlFor="email">Email</label>
-            <input
-              id="email"
-              type="email"
-              className="input"
-              placeholder="you@umak.edu.ph"
-              value={form.email}
-              onChange={update('email')}
-              autoComplete="email"
-              required
-            />
-          </div>
-          <div className="field">
-            <label htmlFor="password">Password</label>
-            <input
-              id="password"
-              type="password"
-              className="input"
-              placeholder="••••••••"
-              value={form.password}
-              onChange={update('password')}
-              autoComplete="current-password"
-              required
-            />
-          </div>
-          <button type="submit" className="btn btn--primary btn--block">
-            Log in
-          </button>
-        </form>
+        <PasswordField placeholder="Enter your password" value={form.password} onChange={update('password')} autoComplete="current-password" />
 
-        <p className="auth__alt">
-          New here? <Link to="/signup">Create an account</Link>
-        </p>
-      </div>
-    </div>
+        <div className="auth__row">
+          <label className="auth__check">
+            <input type="checkbox" /> Remember me
+          </label>
+          <a href="#" className="auth__forgot" onClick={(e) => e.preventDefault()}>Forgot password?</a>
+        </div>
+
+        <button type="submit" className="auth__submit">Log in</button>
+
+        <AuthDivider />
+        <FacebookButton onClick={loginWithFacebook} />
+        <AuthTerms />
+
+        <p className="auth__alt">New here? <Link to="/signup">Sign up</Link></p>
+      </form>
+    </AuthLayout>
   )
 }

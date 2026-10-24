@@ -1,0 +1,50 @@
+/* Shared placeholders: Avatar, Thumb, EmptyState (use in Profile AND Dashboard) */
+.avatar {
+  display: inline-grid;
+  place-items: center;
+  flex-shrink: 0;
+  border-radius: 50%;
+  overflow: hidden;
+  background: linear-gradient(135deg, #f07a3a, #ed6728);
+  color: #fff;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  user-select: none;
+}
+.avatar img { width: 100%; height: 100%; object-fit: cover; }
+
+.thumb {
+  display: inline-grid;
+  place-items: center;
+  flex-shrink: 0;
+  overflow: hidden;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #f58a4d, #ed6728);
+  color: rgba(255, 255, 255, 0.9);
+}
+.thumb img { width: 100%; height: 100%; object-fit: cover; }
+
+.ph-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.5rem;
+  padding: 2.5rem 1.25rem;
+  border: 1.5px dashed rgba(237, 103, 40, 0.35);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.6);
+}
+.ph-empty--compact { padding: 1.25rem 1rem; }
+.ph-empty__icon {
+  display: grid;
+  place-items: center;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: #ffe6d6;
+  color: #c4501a;
+  margin-bottom: 0.25rem;
+}
+.ph-empty__title { margin: 0; font-size: 1.05rem; font-weight: 800; color: var(--text, #3a2a22); }
+.ph-empty__text { margin: 0 0 0.6rem; max-width: 34ch; font-size: 0.9rem; color: var(--text-muted, #7a6a62); }

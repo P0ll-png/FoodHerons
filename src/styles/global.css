@@ -6,8 +6,20 @@
 @import "./tokens.css";
 
 /* Fonts (Poppins for display, Nunito for body) */
+/*--- Metropolis Font ---*/
 @import url("https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&family=Poppins:wght@500;600;700;800&display=swap");
-
+@font-face { font-family: "Metropolis"; font-weight: 400; font-style: normal; font-display: swap;
+  src: url("/fonts/Metropolis-Regular.otf") format("opentype"); }
+@font-face { font-family: "Metropolis"; font-weight: 500; font-style: normal; font-display: swap;
+  src: url("/fonts/Metropolis-Medium.otf") format("opentype"); }
+@font-face { font-family: "Metropolis"; font-weight: 600; font-style: normal; font-display: swap;
+  src: url("/fonts/Metropolis-SemiBold.otf") format("opentype"); }
+@font-face { font-family: "Metropolis"; font-weight: 700; font-style: normal; font-display: swap;
+  src: url("/fonts/Metropolis-Bold.otf") format("opentype"); }
+@font-face { font-family: "Metropolis"; font-weight: 800; font-style: normal; font-display: swap;
+  src: url("/fonts/Metropolis-ExtraBold.otf") format("opentype"); }
+@font-face { font-family: "Metropolis"; font-weight: 900; font-style: normal; font-display: swap;
+  src: url("/fonts/Metropolis-Black.otf") format("opentype"); }
 *,
 *::before,
 *::after {
@@ -21,16 +33,18 @@
 html {
   -webkit-text-size-adjust: 100%;
   scroll-behavior: smooth;
+  scroll-padding-top: calc(var(--header-h) + 16px);
 }
 
 body {
-  font-family: var(--font-sans);
+  font-family: var(--font-brand);
   font-size: var(--fs-base);
   line-height: 1.6;
   color: var(--text);
   background: var(--bg);
   -webkit-font-smoothing: antialiased;
   min-height: 100vh;
+  overflow-x: clip;
   transition: background var(--transition), color var(--transition);
 }
 
@@ -48,10 +62,10 @@ body {
 }
 
 h1, h2, h3, h4 {
-  font-family: var(--font-display);
-  line-height: 1.15;
+  font-family: inherit;
+  line-height: 1.30;
   color: var(--text);
-  font-weight: 700;
+  font-weight: 600;
 }
 
 a {
@@ -72,6 +86,14 @@ button {
   cursor: pointer;
 }
 
+/* Phones draw a grey/blue rectangle on a tapped link or button. It ignores rounded corners, so it looks "boxy". Hide it. */
+a,
+button,
+label,
+[role="button"] {
+  -webkit-tap-highlight-color: transparent;
+}
+
 ul {
   list-style: none;
   padding: 0;
@@ -80,7 +102,6 @@ ul {
 :focus-visible {
   outline: 3px solid var(--orange);
   outline-offset: 2px;
-  border-radius: 4px;
 }
 
 /* ---- Layout helpers ---- */
@@ -119,7 +140,7 @@ ul {
   align-items: center;
   justify-content: center;
   gap: var(--space-2);
-  font-family: var(--font-display);
+  font-family: inherit;
   font-weight: 600;
   font-size: var(--fs-base);
   line-height: 1;
@@ -235,27 +256,29 @@ ul {
 
 /* ---- Form controls ---- */
 .field {
+  margin-top: 36px;
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
-  margin-bottom: var(--space-4);
+  margin-bottom: 32px;
 }
 .field label {
-  font-weight: 700;
+  font-weight: 600;
   font-size: var(--fs-sm);
-  color: var(--text);
+  color: var(--ink);
+  margin-bottom: -4px;
 }
 .input,
 .textarea,
 .select {
   width: 100%;
   font-family: inherit;
-  font-size: var(--fs-base);
+  font-size: var(--fs-sm);
   color: var(--text);
   background: var(--surface);
-  border: 2px solid var(--border-strong);
+  border: 1px solid var(--border-strong);
   border-radius: var(--radius-md);
-  padding: 0.75rem 0.9rem;
+  padding: 0.75rem 0.8rem;
   min-height: 48px;
   transition: border-color var(--transition), box-shadow var(--transition);
 }
@@ -311,11 +334,28 @@ ul {
 
 /* ---- Shared empty / message state ---- */
 .cart-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;      
+  justify-content: center;
   text-align: center;
-  padding: var(--space-8) var(--space-4);
+  width: 100%;
+  max-width: 760px;
+  min-height: 60vh;
+  margin-inline: auto;
+  padding: var(--space-6) var(--space-4);
 }
 .cart-empty__emoji {
-  font-size: 3rem;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: var(--space-3);  
+  width: auto;              
+  height: auto;
+  overflow: visible;
+  flex-shrink: 0;
+  line-height: 0;
+  filter: drop-shadow(0 6px 5px rgba(0, 0, 0, 0.22));
 }
 .cart-empty h1 {
   margin-top: var(--space-3);
@@ -323,7 +363,7 @@ ul {
 }
 
 /* Utility */
-.text-muted { color: var(--text-muted); }
+.text-muted { color: var(--text-muted); text-shadow: 0 2px 4px rgba(0, 0, 0, 0.12); }
 .center { text-align: center; }
 .mt-4 { margin-top: var(--space-4); }
 .stack { display: flex; flex-direction: column; gap: var(--space-4); }
