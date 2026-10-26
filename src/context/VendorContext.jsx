@@ -79,50 +79,79 @@ export function VendorProvider({ children }) {
   const getVendor = useCallback((id) => vendors.find((v) => v.id === id), [vendors])
 
   // Helper: change one vendor and leave the others alone.
-  const patchVendor = (id, change) =>
-    setRawVendors((list) => list.map((v) => (v.id === id ? change(v) : v)))
+  const patchVendor = useCallback(
+    (id, change) => setRawVendors((list) => list.map((v) => (v.id === id ? change(v) : v))),
+    []
+  )
 
   /* ---------- Edit functions (called by the vendor dashboard) ---------- */
 
   // Store info: name, description, category, location, hours, phone, logo, cover.
-  const updateVendorInfo = (id, info) => patchVendor(id, (v) => ({ ...v, ...info }))
+  const updateVendorInfo = useCallback(
+    (id, info) => patchVendor(id, (v) => ({ ...v, ...info })),
+    [patchVendor]
+  )
 
   // Pre-ordering on/off.
-  const setPreorderEnabled = (id, on) => patchVendor(id, (v) => ({ ...v, preorderEnabled: on }))
+  const setPreorderEnabled = useCallback(
+    (id, on) => patchVendor(id, (v) => ({ ...v, preorderEnabled: on })),
+    [patchVendor]
+  )
 
   // Add a new menu item, or update it if the id already exists.
-  const saveMenuItem = (id, item) =>
-    patchVendor(id, (v) => ({
-      ...v,
-      menu: (v.menu || []).some((m) => m.id === item.id)
-        ? v.menu.map((m) => (m.id === item.id ? item : m))
-        : [...(v.menu || []), item],
-    }))
+  const saveMenuItem = useCallback(
+    (id, item) =>
+      patchVendor(id, (v) => ({
+        ...v,
+        menu: (v.menu || []).some((m) => m.id === item.id)
+          ? v.menu.map((m) => (m.id === item.id ? item : m))
+          : [...(v.menu || []), item],
+      })),
+    [patchVendor]
+  )
 
   // Sold out / available switch.
-  const setItemAvailable = (id, itemId, available) =>
-    patchVendor(id, (v) => ({
-      ...v,
-      menu: (v.menu || []).map((m) => (m.id === itemId ? { ...m, available } : m)),
-    }))
+  const setItemAvailable = useCallback(
+    (id, itemId, available) =>
+      patchVendor(id, (v) => ({
+        ...v,
+        menu: (v.menu || []).map((m) => (m.id === itemId ? { ...m, available } : m)),
+      })),
+    [patchVendor]
+  )
 
   // Remove a menu item.
-  const deleteMenuItem = (id, itemId) =>
-    patchVendor(id, (v) => ({ ...v, menu: (v.menu || []).filter((m) => m.id !== itemId) }))
+  const deleteMenuItem = useCallback(
+    (id, itemId) =>
+      patchVendor(id, (v) => ({ ...v, menu: (v.menu || []).filter((m) => m.id !== itemId) })),
+    [patchVendor]
+  )
+
+  const value = useMemo(
+    () => ({
+      vendors,
+      currentVendorId,
+      getVendor,
+      updateVendorInfo,
+      setPreorderEnabled,
+      saveMenuItem,
+      setItemAvailable,
+      deleteMenuItem,
+    }),
+    [
+      vendors,
+      currentVendorId,
+      getVendor,
+      updateVendorInfo,
+      setPreorderEnabled,
+      saveMenuItem,
+      setItemAvailable,
+      deleteMenuItem,
+    ]
+  )
 
   return (
-    <VendorContext.Provider
-      value={{
-        vendors,
-        currentVendorId,
-        getVendor,
-        updateVendorInfo,
-        setPreorderEnabled,
-        saveMenuItem,
-        setItemAvailable,
-        deleteMenuItem,
-      }}
-    >
+    <VendorContext.Provider value={value}>
       {children}
     </VendorContext.Provider>
   )

@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback } from 'react'
+import { createContext, useContext, useState, useCallback, useMemo } from 'react'
 
 /*
   Minimal auth store so the Header and Profile page share one student.
@@ -44,8 +44,21 @@ export function AuthProvider({ children }) {
 
   const logout = useCallback(() => { setUser(null); persist(null) }, [])
 
+  const changePassword = useCallback(() => {
+    throw new Error('Password change is not available yet.')
+  }, [])
+
+  const deleteAccount = useCallback(() => {
+    throw new Error('Account deletion is not available yet.')
+  }, [])
+
+  const value = useMemo(
+    () => ({ user, login, updateUser, logout, changePassword, deleteAccount }),
+    [user, login, updateUser, logout, changePassword, deleteAccount]
+  )
+
   return (
-    <AuthContext.Provider value={{ user, login, updateUser, logout }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   )

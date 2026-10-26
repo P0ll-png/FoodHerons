@@ -11,7 +11,6 @@ import './Profile.css'
 
 // TODO: set these to your real logo image and routes
 const LOGO_SRC = '/images/logo.jpg'
-const ROUTES = { dashboard: '/', menu: '/search' }
 
 // TODO: frontend preview only. Shown when nobody is logged in so the page can be designed/viewed.
 // Delete this and restore the redirect to /login (see Profile() below) once login works.

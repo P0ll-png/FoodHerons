@@ -62,10 +62,13 @@ export function CartProvider({ children }) {
     }
   }, [qtys, vendorId, getVendor])
 
+  const value = useMemo(
+    () => ({ vendorId, items, lines, count, total, addItem, setQty, clearCart }),
+    [vendorId, items, lines, count, total, addItem, setQty, clearCart]
+  )
+
   return (
-    <CartContext.Provider
-      value={{ vendorId, items, lines, count, total, addItem, setQty, clearCart }}
-    >
+    <CartContext.Provider value={value}>
       {children}
     </CartContext.Provider>
   )

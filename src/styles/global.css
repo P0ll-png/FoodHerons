@@ -5,9 +5,9 @@
 
 @import "./tokens.css";
 
-/* Fonts (Poppins for display, Nunito for body) */
+/* Fonts (Nunito for body) */
 /*--- Metropolis Font ---*/
-@import url("https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&family=Poppins:wght@500;600;700;800&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap");
 @font-face { font-family: "Metropolis"; font-weight: 400; font-style: normal; font-display: swap;
   src: url("/fonts/Metropolis-Regular.otf") format("opentype"); }
 @font-face { font-family: "Metropolis"; font-weight: 500; font-style: normal; font-display: swap;

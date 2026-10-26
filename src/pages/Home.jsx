@@ -192,26 +192,7 @@ export default function Home() {
   const { vendors } = useVendors()                        // live store data (edited from the vendor dashboard)
   const [activeCategory, setActiveCategory] = useState(null) // clicked category tile (null = none yet)
   const resultsRef = useRef(null)                         // category results section (we scroll to it)
-  const [userLocation, setUserLocation] = useState(null)  // { lat, lng } from the browser
-  const [locationError, setLocationError] = useState('')  // message if location is denied
   const catScroll = useDragScroll()                       // drag-to-scroll for the category row
-
-  /* ---------- Ask the browser for the user's location (used by the map section) ---------- */
-  useEffect(() => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setUserLocation({
-            lat: position.coords.latitude,
-            lng: position.coords.longitude,
-          })
-        },
-        () => {
-          setLocationError('Unable to retrieve your location')
-        }
-      )
-    }
-  }, [])
 
   /* ---------- Derived data ---------- */
   const openCount = vendors.filter((v) => v.isOpen).length
@@ -368,7 +349,7 @@ export default function Home() {
               width="100%"
               height="100%"
               style={{ border: 0 }}
-              allowFullScreen=""
+              allowFullScreen
               loading="lazy"
               referrerPolicy="no-referrer-when-downgrade"
             ></iframe>
