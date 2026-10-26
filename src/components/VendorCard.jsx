@@ -1,10 +1,10 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import Icon from './Icon'
-import HeronMascot from './HeronMascot'
 import { categoryName } from '../data/vendors'
 import './VendorCard.css'
 
-export default function VendorCard({ vendor }) {
+export default function VendorCard({ vendor, isFavorite, onToggleFavorite }) {
   const {
     id,
     name,
@@ -18,22 +18,35 @@ export default function VendorCard({ vendor }) {
     preorderEnabled,
     coverTint,
     category,
+    cover,
   } = vendor
+
+  const isControlled = typeof isFavorite === 'boolean'
+  const [localFav, setLocalFav] = useState(false)
+  const fav = isControlled ? isFavorite : localFav
+
+  const handleFavorite = (e) => {
+    // The card is a <Link>, so stop the click from navigating
+    e.preventDefault()
+    e.stopPropagation()
+    const next = !fav
+    if (!isControlled) setLocalFav(next)
+    onToggleFavorite?.(id, next)
+  }
 
   return (
     <Link to={`/vendor/${id}`} className="vcard card" aria-label={`${name} store page`}>
-      <div className="vcard__cover" style={{ background: coverTint }}>
-        {/* Vendor photo placeholder — logo.png or vendor photo would go here */}
-        <span className="vcard__cover-logo" aria-hidden="true">
-          <HeronMascot className="logo-mascot" />
-          <img
-            src="/logo.png"
-            alt=""
-            onError={(e) => {
-              e.currentTarget.style.display = 'none'
-            }}
-          />
-        </span>
+      {/* Cover photo from the vendor dashboard; falls back to the tint colour.
+          The url is quoted so file names with spaces or brackets still load. */}
+      <div
+        className="vcard__cover"
+        style={{
+          backgroundColor: coverTint,
+          ...(cover ? { backgroundImage: `url("${cover}")`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}),
+        }}
+      >
+        {/* Store logo from the vendor dashboard; falls back to the placeholder logo */}
+
         <div className="vcard__cover-badges">
           <span className={`badge ${isOpen ? 'badge--open' : 'badge--closed'}`}>
             {isOpen ? 'Open now' : 'Closed'}
@@ -42,6 +55,16 @@ export default function VendorCard({ vendor }) {
             <span className="badge badge--preorder">Pre-order</span>
           )}
         </div>
+
+        <button
+          type="button"
+          className={`vcard__fav${fav ? ' is-active' : ''}`}
+          onClick={handleFavorite}
+          aria-pressed={fav}
+          aria-label={fav ? `Remove ${name} from favourites` : `Add ${name} to favourites`}
+        >
+          <Icon name={fav ? 'heartFilled' : 'heart'} size={20} />
+        </button>
       </div>
 
       <div className="vcard__body">

@@ -1,0 +1,150 @@
+.search-page {
+  padding-block: 16px 48px;
+  min-height: 100vh;
+  min-height: 100dvh;                  
+  background: var(--surface);         
+  font-family: inherit;
+}
+
+/* ---------- Top bar: back arrow + search pill ---------- */
+.search-page__bar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.search-page__back {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--ink);
+  cursor: pointer;
+}
+.search-page__back:hover { background: var(--orange-soft); }
+
+.search-page__field {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 46px;
+  padding: 0 16px;
+  border-radius: 999px;
+  background: #F5F5F5;
+  color: var(--text-faint);
+  cursor: text;
+}
+.search-page__field:focus-within {
+  box-shadow: 0 5px 8px -2px rgba(0, 0, 0, 0.28), 0 0 0 1px var(--orange);
+}
+.search-page__field svg { flex: none; }
+.search-page__field input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: var(--fs-base);
+  color: var(--ink);
+}
+.search-page__field input::placeholder { color: var(--text-faint); }
+.search-page__field input:focus,
+.search-page__field input:focus-visible {
+  outline: none;                      
+  box-shadow: none;
+}
+
+.search-page__clear {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  margin-right: -6px;                 
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--ink);
+  cursor: pointer;
+}
+.search-page__clear:hover { background: rgba(0, 0, 0, 0.08); }
+
+/* ---------- Recent searches ---------- */
+.search-page__heading {
+  margin: 32px 0 6px;
+  font-size: var(--fs-base);
+  font-weight: 700;
+  color: var(--ink);
+}
+.recent { list-style: none; margin: 0; padding: 0; }
+.recent__row { display: flex; align-items: center; gap: 8px; }
+
+.recent__item {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border: 0;
+  background: none;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: var(--fs-sm);
+  text-align: left;
+  cursor: pointer;
+}
+.recent__item svg { flex: none; color: var(--text-faint); }
+.recent__item span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.recent__item:hover span { color: var(--ink); }
+
+.recent__remove {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--ink);
+  cursor: pointer;
+}
+.recent__remove:hover { background: var(--orange-soft); }
+
+/* ---------- Results / empty ---------- */
+.search-page .grid { margin-top: 22px; }
+.search-page__empty {
+  margin-top: 32px;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+/* ---------- Popular stalls (shown under Recent Searches while the box is empty) ---------- */
+.popular { margin-top: 12px; }
+.popular__heading {
+  font-size: var(--fs-base);
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.popular__icon { color: var(--yellow); }   
+.popular .vcard__cover-logo { display: none; }
+.popular__sub {
+  margin: 0;
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+}

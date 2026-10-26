@@ -1,29 +1,45 @@
 import { useMemo, useState } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
 import Icon from '../components/Icon'
-import HeronMascot from '../components/HeronMascot'
-import { getVendor, categoryName } from '../data/vendors'
+import { categoryName } from '../data/vendors'
+import { useVendors } from '../context/VendorContext'
 import { useCart } from '../context/CartContext'
 import NotFound from './NotFound'
+import ReviewsModal from '../components/ReviewsModal'
+import { getReviewsFor } from '../data/reviews'
 import './VendorStore.css'
+
+const Peso = ({ value }) => (
+  <span className="price">
+    <Icon name="peso" className="price__icon" />
+    <span className="price__num">{Number(value || 0).toLocaleString('en-PH')}</span>
+  </span>
+)
+
 
 export default function VendorStore() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const { getVendor } = useVendors() 
   const vendor = getVendor(id)
   const { items, addItem, setQty, count, total, vendorId } = useCart()
 
-  // Menu items grouped by category for display.
+ const [filter, setFilter] = useState('all')
+  const [reviewsOpen, setReviewsOpen] = useState(false) // reviews pop-up
+
+  const reviewData = useMemo(() => (vendor ? getReviewsFor(vendor) : { reviews: [], breakdown: undefined }), [vendor])
   const grouped = useMemo(() => {
     if (!vendor) return {}
-    return vendor.menu.reduce((acc, item) => {
+    return (vendor.menu || []).reduce((acc, item) => {
       ;(acc[item.category] ||= []).push(item)
       return acc
     }, {})
   }, [vendor])
+  
 
   if (!vendor) return <NotFound />
-
+  const activeFilter = filter === 'all' || grouped[filter] ? filter : 'all'
+  const shown = Object.entries(grouped).filter(([cat]) => activeFilter === 'all' || cat === activeFilter)
   const {
     name,
     description,
@@ -34,9 +50,8 @@ export default function VendorStore() {
     rating,
     reviews,
     preorderEnabled,
-    category,
-    coverTint,
   } = vendor
+  const canOrder = preorderEnabled && isOpen
 
   // Cart lines belong to this vendor only.
   const cartIsThisVendor = vendorId === vendor.id
@@ -52,164 +67,218 @@ export default function VendorStore() {
       </div>
 
       {/* ---------- Store header ---------- */}
-      <header className="store-head" style={{ background: coverTint }}>
-        <div className="container store-head__inner">
-          <span className="store-head__logo" aria-hidden="true">
-            <HeronMascot className="logo-mascot" />
-            <img
-              src="/logo.png"
-              alt=""
-              onError={(e) => (e.currentTarget.style.display = 'none')}
-            />
+      <div className="container">
+       <div className="store-hero">
+         <div className="store-hero__cover"
+            style={vendor.cover ? { backgroundImage: `url("${vendor.cover}")` } : undefined}
+            aria-hidden="true"
+          />
+
+        <div className="store-hero__row">
+          <span className="store-hero__avatar" aria-hidden="true">
+            {vendor.logo && (
+                <img
+                src={vendor.logo}
+                alt=""
+                onError={(e) => { e.currentTarget.style.display = 'none' }}
+              />
+             )}
           </span>
-          <div className="store-head__meta">
-            <div className="store-head__badges">
-              <span className={`badge ${isOpen ? 'badge--open' : 'badge--closed'}`}>
-                {isOpen ? 'Open now' : 'Closed'}
-              </span>
-              <span className="badge badge--preorder">
-                {preorderEnabled ? 'Pre-order available' : 'Listing only'}
-              </span>
-            </div>
-            <h1>{name}</h1>
-            <p className="store-head__desc">{description}</p>
-            <ul className="store-head__facts">
-              <li><Icon name="starSolid" size={16} className="fact-star" /> {rating} ({reviews} reviews)</li>
-              <li><Icon name="pin" size={16} /> {locationArea}</li>
-              <li><Icon name="clock" size={16} /> {hoursOpen}–{hoursClose}</li>
-              <li><span className="chip chip--active">{categoryName(category)}</span></li>
-            </ul>
-          </div>
+
+        <div className="store-hero__info">
+        <div className="store-hero__title">
+          <h1>{name}</h1>
+          <span className={`badge ${isOpen ? 'badge--open' : 'badge--closed'}`}>
+            {isOpen ? 'Open Now' : 'Closed'}
+          </span>
+          <span className="store-hero__preorder">
+            {preorderEnabled ? 'Available Pre-Order' : 'Listing only'}
+          </span>
         </div>
-      </header>
+        <p className="store-head__desc">{description}</p>
+        <ul className="store-head__facts">
+          <li>
+            {/* Clicking the rating opens the reviews pop-up */}
+            <button
+              type="button"
+              className="fact-rating"
+              onClick={() => setReviewsOpen(true)}
+              aria-haspopup="dialog"
+              aria-label={`${rating} stars from ${reviews} ratings. See reviews`}
+            >
+              <Icon name="star" size={16} className="fact-star" /> {rating} ({reviews})
+            </button>
+          </li>
+          <li><Icon name="pin" size={16} /> {locationArea}</li>
+          <li><Icon name="clock" size={16} /> {hoursOpen}–{hoursClose}</li>
+          {vendor.phone && (
+            <li><a href={`tel:${vendor.phone.replace(/\s/g, '')}`}>{vendor.phone}</a></li>
+          )}
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
 
       {/* ---------- Body ---------- */}
       <div className="container store-body">
         <section className="store-menu" aria-label="Menu">
-          <div className="section-head">
-            <div>
-              <h2>{preorderEnabled ? 'Menu & pre-order' : 'Menu'}</h2>
-              <p>
-                {preorderEnabled
-                  ? 'Add items, then review your pre-order. Pay cash on pickup.'
-                  : 'This vendor is not accepting pre-orders. Visit the stall to buy.'}
-              </p>
+          {!preorderEnabled && (
+           <p className="store-note">This vendor is not accepting pre-orders. Visit the stall to buy.</p>
+         )}
+          {preorderEnabled && !isOpen && (
+           <p className="store-note store-note--closed">
+             This store is closed right now. Pre-orders open at {hoursOpen}.
+           </p>
+         )}
+
+     <div className="store-filter" role="group" aria-label="Filter menu by category">
+      <span className="store-filter__label">Filter:</span>
+      <button
+       type="button"
+       className={`store-filter__chip ${activeFilter === 'all' ? 'store-filter__chip--active' : ''}`}
+       onClick={() => setFilter('all')}
+       >
+        All
+      </button>
+        {Object.keys(grouped).map((cat) => (
+      <button
+       key={cat}
+       type="button"
+       className={`store-filter__chip ${activeFilter === cat ? 'store-filter__chip--active' : ''}`}
+       onClick={() => setFilter(cat)}
+      >
+       {categoryName(cat)}
+     </button>
+      ))}
+     </div>
+          {shown.map(([cat, menuItems]) =>  (
+          <div key={cat} className="menu-group">
+            <h3 className="menu-group__title">{categoryName(cat)}</h3>
+            <ul className="menu-list">
+            {menuItems.map((item) => {
+              const qty = lineQty(item.id)
+              const disabled = !item.available
+              return (
+              <li key={item.id} className={`menu-item ${disabled ? 'menu-item--out' : ''}`}>
+              <div className="menu-item__thumb" aria-hidden="true">
+                  {item.image && (
+                  <img
+                  src={item.image}
+                  alt=""
+                  onError={(e) => { e.currentTarget.style.display = 'none' }}
+                  />
+                  )}
+              </div>
+
+            <div className="menu-item__info ">
+              <p className="menu-item__name">
+                {item.name}
+                {disabled && <span className="menu-item__flag">Sold out</span>}
+               </p>
+               <p className="menu-item__desc">{item.desc ?? 'Campus food, found fast.'}</p>
+               <p className="menu-item__price"><Peso value={item.price} /></p>
             </div>
-          </div>
 
-          {Object.entries(grouped).map(([cat, menuItems]) => (
-            <div key={cat} className="menu-group">
-              <h3 className="menu-group__title">{categoryName(cat)}</h3>
-              <ul className="menu-list">
-                {menuItems.map((item) => {
-                  const qty = lineQty(item.id)
-                  const disabled = !item.available
-                  return (
-                    <li
-                      key={item.id}
-                      className={`menu-item ${disabled ? 'menu-item--out' : ''}`}
-                    >
-                      <div className="menu-item__info">
-                        <p className="menu-item__name">
-                          {item.name}
-                          {disabled && <span className="menu-item__flag">Sold out</span>}
-                        </p>
-                        {item.desc && (
-                          <p className="menu-item__desc">{item.desc}</p>
-                        )}
-                        <p className="menu-item__price">₱{item.price}</p>
-                      </div>
+          {canOrder && !disabled && (
+            <div className="menu-item__action">
+              {qty > 0 ? (
+               <div className="stepper" role="group" aria-label={`Quantity of ${item.name}`}>
+                 <button
+                  type="button"
+                  className="stepper__btn"
+                  onClick={() => setQty(item.id, qty - 1)}
+                  aria-label={qty === 1 ? `Remove ${item.name} from cart` : `Remove one ${item.name}`}
+                >
+                <Icon name={qty === 1 ? 'trash' : 'minus'} size={16} />
+                </button>
+                <span className="stepper__count" aria-live="polite">{qty}</span>
+                <button type="button" className="stepper__btn"
+                  onClick={() => addItem(vendor.id, item)}
+                  aria-label={`Add one ${item.name}`}>
+                <Icon name="plus" size={16} />
+                </button>
+           </div>
+           ) : (
+          <button type="button" className="menu-item__add"
+                onClick={() => addItem(vendor.id, item)}>
+          <Icon name="plus" size={14} /> Add
+          </button>
+          )}
+         </div>
+         )}
+       </li>
+         )
+        })}
+        </ul>
+        </div>
+        ))}
+      </section>
 
-                      {preorderEnabled && !disabled && (
-                        <div className="menu-item__action">
-                          {qty > 0 ? (
-                            <div className="stepper" role="group" aria-label={`Quantity of ${item.name}`}>
-                              <button
-                                className="stepper__btn"
-                                onClick={() => setQty(item.id, qty - 1)}
-                                aria-label={`Remove one ${item.name}`}
-                              >
-                                <Icon name="minus" size={16} />
-                              </button>
-                              <span className="stepper__count" aria-live="polite">{qty}</span>
-                              <button
-                                className="stepper__btn"
-                                onClick={() => addItem(vendor.id, item)}
-                                aria-label={`Add one ${item.name}`}
-                              >
-                                <Icon name="plus" size={16} />
-                              </button>
-                            </div>
-                          ) : (
-                            <button
-                              className="btn btn--primary menu-item__add"
-                              onClick={() => addItem(vendor.id, item)}
-                            >
-                              <Icon name="plus" size={16} /> Add
-                            </button>
-                          )}
-                        </div>
-                      )}
-                    </li>
-                  )
-                })}
-              </ul>
-            </div>
-          ))}
-        </section>
-
-        {/* ---------- Order summary (pre-order vendors only) ---------- */}
+      {/* ---------- Order summary (pre-order vendors only) ---------- */}
         {preorderEnabled && (
           <aside className="store-aside">
             <div className="order-box card">
-              <h3 className="order-box__title">Your pre-order</h3>
+              <h3 className="order-box__title">Your Pre-Order</h3>
               {cartIsThisVendor && count > 0 ? (
-                <>
-                  <ul className="order-box__lines">
-                    {Object.values(items).map(({ item, qty }) => (
-                      <li key={item.id}>
-                        <span className="order-box__qty">{qty}×</span>
-                        <span className="order-box__name">{item.name}</span>
-                        <span className="order-box__amt">₱{item.price * qty}</span>
-                      </li>
-                    ))}
-                  </ul>
-                  <div className="order-box__total">
-                    <span>Total</span>
-                    <strong>₱{total}</strong>
-                  </div>
-                  <button
-                    className="btn btn--primary btn--block"
-                    onClick={() => navigate('/cart')}
-                  >
-                    Review pre-order
-                  </button>
-                  <p className="order-box__note">
-                    Cash on pickup · No online payment
-                  </p>
-                </>
-              ) : (
+           <>
+          <ul className="order-box__lines">
+              {Object.values(items).map(({ item, qty }) => (
+              <li key={item.id}>
+               <span className="order-box__name">{qty}x {item.name}</span>
+               <span className="order-box__amt"><Peso value={item.price * qty} /></span>
+              </li>
+             ))}
+          </ul>
+           <div className="order-box__total">
+             <span>TOTAL</span>
+             <span><Peso value={total} /></span>
+           </div>
+           <button type="button" className="order-box__btn" onClick={() => navigate('/cart')}>
+              Review Pre-Order
+           </button>
+           <p className="order-box__note">Cash on Pickup · No Online Payment</p>
+           </>
+          ) : (
                 <div className="order-box__empty">
                   <Icon name="cart" size={28} className="order-box__empty-icon" />
                   <p>Your cart is empty. Add items from the menu to start a pre-order.</p>
                 </div>
               )}
             </div>
+
           </aside>
         )}
       </div>
 
-      {/* Mobile sticky cart bar for pre-order vendors */}
-      {preorderEnabled && cartIsThisVendor && count > 0 && (
-        <div className="mobile-cartbar">
-          <div className="mobile-cartbar__info">
-            <strong>{count} item{count === 1 ? '' : 's'}</strong>
-            <span>₱{total}</span>
-          </div>
-          <button className="btn btn--primary" onClick={() => navigate('/cart')}>
-            Review pre-order
-          </button>
-        </div>
+      {/* ---------- Reviews pop-up ---------- */}
+      <ReviewsModal
+        open={reviewsOpen}
+        onClose={() => setReviewsOpen(false)}
+        vendor={vendor}
+        reviews={reviewData.reviews}
+        breakdown={reviewData.breakdown}
+        onOrder={() =>
+          document.querySelector('.store-menu')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        }
+      />
+
+      {canOrder && cartIsThisVendor && count > 0 && (
+              <button
+        type="button"
+        className="mobile-cartbar"
+        onClick={() => navigate('/cart')}
+        aria-label={`Review pre-order, ${count} item${count === 1 ? '' : 's'}, ${total} pesos`}
+      >
+      <span className="mobile-cartbar__count">{count}</span>
+      <span className="mobile-cartbar__label">
+        <strong>Review Pre-Order</strong>
+        <small>{locationArea}</small>
+      </span>
+      <span className="mobile-cartbar__price">
+       <Peso value={total} />
+      </span>
+    </button>
       )}
     </>
   )

@@ -9,10 +9,11 @@ export default function Footer() {
       <WaveDivider className="footer__wave" />
       <div className="container footer__grid">
         <div className="footer__brand">
+          <div className = "footer__brand-top">
           <span className="footer__logo">
             <HeronMascot className="logo-mascot" />
             <img
-              src="/logo.png"
+              src="/images/logo.jpg"
               alt=""
               aria-hidden="true"
               onError={(e) => {
@@ -25,30 +26,41 @@ export default function Footer() {
             <p className="footer__tag">Campus food, found fast.</p>
           </div>
         </div>
-
+        <p className="footer__about">
+         A student project for the University of Makati. Browse campus
+         vendors and pre-order where available. Pickup only, cash on pickup.
+        </p>
+        </div>
+        
         <nav className="footer__col" aria-label="Explore">
           <h3>Explore</h3>
-          <Link to="/">Vendor directory</Link>
-          <Link to="/?open=1">Open now</Link>
-          <Link to="/signup">Become a vendor</Link>
+          <Link to="/">Open Now </Link>
+          <Link to="/">View Map</Link>
+          <Link to="/">About us</Link>
         </nav>
 
         <nav className="footer__col" aria-label="For vendors">
           <h3>For vendors</h3>
-          <Link to="/dashboard">Vendor dashboard</Link>
-          <Link to="/signup?role=vendor">Create a store</Link>
+          <Link to="/signup?role=vendor">Become a vendor</Link>
           <Link to="/login">Log in</Link>
+          <Link to="/">Partner FAQs</Link>
         </nav>
 
-        <div className="footer__col">
-          <h3>About</h3>
-          <p className="footer__about">
-            A student project for the University of Makati. Browse campus
-            vendors and pre-order where available. Pickup only, cash on pickup.
-          </p>
-        </div>
+        <div className="footer__col"> 
+          <h3>Contact us</h3>
+            <div className="footer__social">  {/* placeholders only */}
+              <a href="mailto:hello@foodherons.com" aria-label="Email">
+                <img src="/images/email.png" alt="" onError={(e) => { e.currentTarget.style.display = 'none' }} />
+              </a>
+              <a href="https://facebook.com" aria-label="Facebook" target="_blank" rel="noreferrer">
+                 <img src="/images/facebook.png" alt="" onError={(e) => { e.currentTarget.style.display = 'none' }} />
+              </a>
+              <a href="https://m.me" aria-label="Messenger" target="_blank" rel="noreferrer">
+                <img src="/images/messenger.png" alt="" onError={(e) => { e.currentTarget.style.display = 'none' }} />
+               </a>
+             </div>
+         </div>
       </div>
-
       <div className="container footer__bottom">
         <p>© {new Date().getFullYear()} Food Herons · UMAK campus · Made for students</p>
       </div>

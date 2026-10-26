@@ -3,8 +3,9 @@
   top: 0;
   z-index: 50;
   background: var(--header-bg);
-  backdrop-filter: saturate(180%) blur(10px);
-  border-bottom: 1px solid var(--border);
+  background: var(--orange);
+  border-bottom: none;
+  box-shadow: 2px 4px 4px rgba(156, 42, 42, 0.25);
 }
 
 .header__bar {
@@ -19,7 +20,7 @@
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  color: var(--text);
+  color: #ffffff;
   margin-right: auto;
 }
 .brand:hover {
@@ -27,16 +28,15 @@
 }
 
 .brand__logo {
-  width: 44px;
-  height: 44px;
-  border-radius: var(--radius-lg);
-  /* Empty logo placeholder — swap logo.png in /public to fill it */
+  width: 40px;
+  height: 40px;
+  border-radius: 100px;
+  /* Empty logo placeholder — swap logo.jpg in /public/images to fill it */
   background: linear-gradient(135deg, var(--orange), var(--yellow));
   display: grid;
   place-items: center;
   overflow: hidden;
   flex-shrink: 0;
-  box-shadow: var(--shadow-sm);
 }
 .brand__logo img {
   width: 100%;
@@ -50,16 +50,16 @@
   line-height: 1.1;
 }
 .brand__name {
-  font-family: var(--font-display);
   font-weight: 800;
-  font-size: var(--fs-lg);
-  color: var(--orange-dark);
+  font-size: var(--fs-base);
+  color:  #ffffff;
 }
 .brand__tag {
   font-size: var(--fs-xs);
-  color: var(--text-faint);
-  font-weight: 600;
+  color: rgba(255, 255, 255, 0.75);
+  font-weight: 500;
 }
+@media (min-width: 981px) { .brand { margin-left: -0.5cm; } }
 
 /* ---- Nav ---- */
 .nav {
@@ -68,20 +68,24 @@
   gap: var(--space-5);
 }
 .nav__link {
-  color: var(--text-muted);
-  font-weight: 700;
+  color: var(--on-primary);
+  font-weight: 600;
   font-size: var(--fs-sm);
   padding: 0.4rem 0;
   border-bottom: 2px solid transparent;
 }
 .nav__link:hover,
 .nav__link.active {
-  color: var(--orange-dark);
-  border-color: var(--orange);
+  color: var(--on-primary);
+  border-color: var(--on-primary);
 }
 .nav__cta {
+  background: var(--surface);
+  color: var(--orange-dark);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
   padding: 0.6rem 1.1rem;
 }
+.nav__cta:hover { background: var(--orange-soft); color: var(--orange-dark); }
 
 /* ---- Actions ---- */
 .header__actions {
@@ -99,25 +103,25 @@
   border-radius: 50%;
   border: none;
   background: transparent;
-  color: var(--text-muted);
+  color: var(--on-primary);
   transition: background var(--transition), color var(--transition);
 }
 .icon-btn:hover {
-  background: var(--surface-2);
-  color: var(--orange-dark);
+  background: rgba(255, 255, 255, 0.2);
+  color: var(--on-primary);
 }
 
 .cart-count {
   position: absolute;
-  top: 4px;
-  right: 2px;
-  min-width: 18px;
-  height: 18px;
+  top: 8px;
+  right: 4px;
+  min-width: 14px;
+  height: 14px;
   padding: 0 4px;
   border-radius: 999px;
-  background: var(--orange);
-  color: #fff;
-  font-size: 11px;
+  background: var(--surface);
+  color: var(--orange-dark);
+  font-size: var(--fs-xs);
   font-weight: 800;
   display: grid;
   place-items: center;
@@ -126,22 +130,23 @@
 
 .nav-toggle {
   display: none;
+  color: var(--on-primary);
 }
 
 /* ---- Mobile ---- */
-@media (max-width: 860px) {
+@media (max-width: 980px) {
   .nav {
     position: fixed;
     inset: var(--header-h) 0 auto 0;
     flex-direction: column;
     align-items: stretch;
     gap: 0;
-    background: var(--bg-elevated);
+    background: var(--orange);
     border-bottom: 1px solid var(--border);
     padding: var(--space-3) var(--space-4) var(--space-5);
     box-shadow: var(--shadow-md);
     transform: translateY(-120%);
-    transition: transform var(--transition);
+    transition: transform var(--transition), visibility var(--transition); /* keeps the menu visible while it slides out */
     visibility: hidden;
   }
   .nav--open {
@@ -154,8 +159,8 @@
   }
   .nav__link:hover,
   .nav__link.active {
-    border-color: var(--border);
-    color: var(--orange-dark);
+    border-color: #ffffff;
+    color: #ffffff;
   }
   .nav__cta {
     margin-top: var(--space-3);
@@ -170,7 +175,61 @@
 }
 
 @media (max-width: 420px) {
-  .brand__name {
-    font-size: var(--fs-base);
+  .brand__logo {
+     width: 36px;
+  height: 36px;
   }
+  .brand__name {
+    margin-left: -4px;
+    font-size: var(--fs-sm);
+  }
+}
+/* ---- Student profile chip ---- */
+.profile-chip {
+  display: inline-flex;
+  align-items: center;
+  height: auto;
+  padding: 0.4rem 0;
+  margin: 0 var(--space-2);
+  background: transparent;
+  border-radius: 0;
+  border-bottom: 2px solid transparent;
+  color: var(--on-primary);
+  font-weight: 700;
+  font-size: var(--fs-sm);
+  transition: border-color var(--transition);
+}
+.profile-chip:hover,
+.profile-chip.active {
+  background: transparent;
+  color: var(--on-primary);
+  border-color: var(--on-primary);
+}
+.profile-chip:focus-visible { outline: 3px solid #ffffff; outline-offset: 2px; }
+
+/* Selector is "chip + avatar" so it always beats .avatar { display: inline-grid } from ui.css,
+   no matter which stylesheet loads first */
+.profile-chip .profile-chip__avatar { display: none; }
+
+.nav__link--profile { display: none; } 
+
+@media (max-width: 980px) {
+  .nav__link--profile { display: block; }
+}
+
+/* Small phones: name is hidden, so fall back to the avatar only */
+@media (max-width: 560px) {
+  .profile-chip {
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    margin: 0;
+    justify-content: center;
+    border-bottom: none;
+  }
+  .profile-chip .profile-chip__avatar {
+    display: inline-grid;
+    border: 2px solid #ffffff;
+  }
+  .profile-chip__name { display: none; }
 }

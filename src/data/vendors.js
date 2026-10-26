@@ -2,12 +2,13 @@
 // In production this comes from the C# backend / Supabase (MySQL).
 
 export const categories = [
-  { id: 'rice', name: 'Rice Meals', emoji: '🍚' },
-  { id: 'snacks', name: 'Snacks', emoji: '🍟' },
-  { id: 'drinks', name: 'Drinks', emoji: '🥤' },
-  { id: 'desserts', name: 'Desserts', emoji: '🍰' },
-  { id: 'noodles', name: 'Noodles', emoji: '🍜' },
-  { id: 'grill', name: 'Grill & BBQ', emoji: '🍢' },
+  { id: 'rice',     name: 'Rice Meals',  image: '/images/ricemeals.png' }, /* the images are placeholder for now */
+  { id: 'snacks',   name: 'Snacks',     image: '/images/snacks.png'  },
+  { id: 'drinks',   name: 'Drinks',      image: '/images/drinks.png'  },
+  { id: 'desserts', name: 'Desserts',    image: '/images/desserts.png' },
+  { id: 'noodles',  name: 'Noodles',      image: '/images/noodles.png'  },
+  { id: 'grill',    name: 'Grill & BBQ', image: '/images/grill.png' },
+
 ]
 
 export const locationAreas = [
@@ -24,7 +25,9 @@ export const vendors = [
   {
     id: 'tita-nenas',
     name: "Tita Nena's Silog",
-    category: 'rice',
+    /* logo: '/images/pb.png',
+    cover: '/images/ph.jpg', */ /* just an example*/
+    category: 'rice', 
     locationArea: 'Food Court',
     description:
       'Home-style silog plates served hot all day. Student favorite near the Food Court.',
@@ -33,6 +36,7 @@ export const vendors = [
     isOpen: true,
     rating: 4.8,
     reviews: 212,
+    phone: '0917 123 4567',
     preorderEnabled: true,
     coverTint: 'var(--orange-soft)',
     menu: [
