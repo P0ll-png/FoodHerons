@@ -9,6 +9,14 @@ dist-ssr
 .env.*
 !.env.example
 
+# C# order service (Phase C): ignore build output + real env files,
+# but keep the committed placeholder template tracked. The negation MUST come
+# after the .env ignore lines above to take effect.
+server/**/bin/
+server/**/obj/
+server/**/.env
+!server/FoodHerons.Api/.env.example
+
 # Seed-script env files stay ignored (covered by .env / .env.* above),
 # but the placeholder template must be tracked. The negation MUST come after
 # the .env.* ignore line to take effect.
