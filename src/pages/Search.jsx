@@ -2,7 +2,6 @@ import { useMemo, useRef, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import Icon from '../components/Icon'            // every icon on this page comes from Icon.jsx
 import VendorCard from '../components/VendorCard' // the same store card used on Home
-import { categoryName } from '../data/vendors'
 import { useVendors } from '../context/VendorContext' // live store data (edited from the vendor dashboard)
 import './Search.css'
 
@@ -26,7 +25,7 @@ export default function Search() {
   const inputRef = useRef(null)
   const navigate = useNavigate()
   const location = useLocation()
-  const { vendors } = useVendors() // live data, so dashboard edits show up in search
+  const { vendors, categoryName } = useVendors() // live data, so dashboard edits show up in search
   const [query, setQuery] = useState('')
   const [recent, setRecent] = useState(loadRecent)
 

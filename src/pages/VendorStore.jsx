@@ -1,12 +1,11 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
 import Icon from '../components/Icon'
-import { categoryName } from '../data/vendors'
+import { supabase } from '../lib/supabase'
 import { useVendors } from '../context/VendorContext'
 import { useCart } from '../context/CartContext'
 import NotFound from './NotFound'
 import ReviewsModal from '../components/ReviewsModal'
-import { getReviewsFor } from '../data/reviews'
 import './VendorStore.css'
 
 const Peso = ({ value }) => (
@@ -20,14 +19,47 @@ const Peso = ({ value }) => (
 export default function VendorStore() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { getVendor } = useVendors() 
+  const { getVendor, categoryName } = useVendors()
   const vendor = getVendor(id)
   const { items, addItem, setQty, count, total, vendorId } = useCart()
 
  const [filter, setFilter] = useState('all')
   const [reviewsOpen, setReviewsOpen] = useState(false) // reviews pop-up
+  const [reviews, setReviews] = useState([])            // real reviews from Supabase (read-only)
 
-  const reviewData = useMemo(() => (vendor ? getReviewsFor(vendor) : { reviews: [], breakdown: undefined }), [vendor])
+  // Load this vendor's reviews (newest first). The 'Ordered:' line uses the
+  // ordered_summary snapshot column directly — no order_items join.
+  useEffect(() => {
+    let active = true
+    supabase
+      .from('reviews')
+      .select('id, author_name, ordered_summary, rating, text, helpful_count, created_at')
+      .eq('vendor_id', id)
+      .order('created_at', { ascending: false })
+      .then(({ data, error }) => {
+        if (!active) return
+        if (error) {
+          console.error('Failed to load reviews:', error)
+          setReviews([])
+          return
+        }
+        setReviews(
+          (data || []).map((r) => ({
+            id: r.id,
+            name: r.author_name,
+            rating: r.rating,
+            text: r.text,
+            ordered: r.ordered_summary,
+            helpful: r.helpful_count,
+            createdAt: r.created_at,
+          }))
+        )
+      })
+    return () => {
+      active = false
+    }
+  }, [id])
+
   const grouped = useMemo(() => {
     if (!vendor) return {}
     return (vendor.menu || []).reduce((acc, item) => {
@@ -48,7 +80,7 @@ export default function VendorStore() {
     hoursClose,
     isOpen,
     rating,
-    reviews,
+    reviews: reviewCount,
     preorderEnabled,
   } = vendor
   const canOrder = preorderEnabled && isOpen
@@ -104,9 +136,9 @@ export default function VendorStore() {
               className="fact-rating"
               onClick={() => setReviewsOpen(true)}
               aria-haspopup="dialog"
-              aria-label={`${rating} stars from ${reviews} ratings. See reviews`}
+              aria-label={`${rating} stars from ${reviewCount} ratings. See reviews`}
             >
-              <Icon name="star" size={16} className="fact-star" /> {rating} ({reviews})
+              <Icon name="star" size={16} className="fact-star" /> {rating} ({reviewCount})
             </button>
           </li>
           <li><Icon name="pin" size={16} /> {locationArea}</li>
@@ -256,8 +288,7 @@ export default function VendorStore() {
         open={reviewsOpen}
         onClose={() => setReviewsOpen(false)}
         vendor={vendor}
-        reviews={reviewData.reviews}
-        breakdown={reviewData.breakdown}
+        reviews={reviews}
         onOrder={() =>
           document.querySelector('.store-menu')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
         }

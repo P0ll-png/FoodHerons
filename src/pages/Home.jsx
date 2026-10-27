@@ -2,7 +2,6 @@ import { useMemo, useState, useEffect, useRef } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import Icon from '../components/Icon'
 import VendorCard from '../components/VendorCard'
-import { categories, locationAreas } from '../data/vendors'
 import { useVendors } from '../context/VendorContext'
 import './Home.css'
 
@@ -60,6 +59,7 @@ function useDragScroll() {
 /* ================================================================== */
 function VendorResults({
   list,
+  locationAreas = [],
   title,
   headingId,
   subtitle,
@@ -122,7 +122,7 @@ function VendorResults({
             >
               <option value="all">All Areas</option>
               {locationAreas.map((a) => (
-                <option key={a} value={a}>{a}</option>
+                <option key={a.id} value={a.id}>{a.name}</option>
               ))}
             </select>
           </div>
@@ -189,7 +189,7 @@ function VendorResults({
 export default function Home() {
   /* ---------- State & data ---------- */
   const [params, setParams] = useSearchParams()
-  const { vendors } = useVendors()                        // live store data (edited from the vendor dashboard)
+  const { vendors, categories, locationAreas } = useVendors() // live store data (edited from the vendor dashboard)
   const [activeCategory, setActiveCategory] = useState(null) // clicked category tile (null = none yet)
   const resultsRef = useRef(null)                         // category results section (we scroll to it)
   const catScroll = useDragScroll()                       // drag-to-scroll for the category row
@@ -360,6 +360,7 @@ export default function Home() {
         <div className="container section" role="region" aria-labelledby="dir-heading">
           <VendorResults
             list={vendors}
+            locationAreas={locationAreas}
             headingId="dir-heading"
             title="Vendors near you"
             subtitle="match your filters"

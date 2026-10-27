@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import Icon from './Icon'
-import { categoryName } from '../data/vendors'
+import { useVendors } from '../context/VendorContext'
 import './VendorCard.css'
 
 export default function VendorCard({ vendor, isFavorite, onToggleFavorite }) {
+  const { categoryName } = useVendors()
   const {
     id,
     name,

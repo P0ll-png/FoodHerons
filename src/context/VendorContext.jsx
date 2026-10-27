@@ -1,15 +1,14 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
-import { vendors as seedVendors } from '../data/vendors'
+import { supabase } from '../lib/supabase'
+import { useAuth } from './AuthContext'
 
 /* ------------------------------------------------------------------ */
 /*  VendorContext: the ONE shared source of truth for stores + menus.  */
-
+/*  Data is read from Supabase (vendors + menu_items + categories +    */
+/*  location_areas). The DB uses snake_case; the UI uses camelCase, so  */
+/*  this file is the ONE place that maps between the two.               */
 /* ------------------------------------------------------------------ */
 
-// Bump this number whenever the shape of the starter data changes. Browsers that
-// saved an older copy would otherwise keep showing it instead of the new data.
-const STORAGE_KEY = 'fh-vendors-v2'
-const OLD_STORAGE_KEYS = ['fh-vendors-v1']
 const VendorContext = createContext()
 
 // "HH:MM" -> minutes since midnight (used to compare opening hours).
@@ -25,38 +24,98 @@ export const isOpenNow = (open, close, date = new Date()) => {
   return start <= end ? m >= start && m < end : m >= start || m < end
 }
 
-// Load saved vendors, or fall back to the starter data in data/vendors.js.
-function loadVendors() {
-  try {
-    OLD_STORAGE_KEYS.forEach((k) => localStorage.removeItem(k)) // clean up outdated saves
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (raw) {
-      const saved = JSON.parse(raw)
-      if (Array.isArray(saved) && saved.length) return saved
-    }
-  } catch {
-    /* corrupted or blocked storage: use the starter data */
-  }
-  return seedVendors
-}
+// snake_case menu_items row -> camelCase UI menu item.
+const mapMenuItem = (r) => ({
+  id: r.id,
+  name: r.name,
+  price: r.price,
+  category: r.category,
+  available: r.available,
+  desc: r.description,
+  image: r.image_url,
+})
+
+// snake_case vendors row (+ its grouped menu) -> camelCase UI vendor.
+const mapVendor = (r, menu) => ({
+  id: r.id,
+  name: r.name,
+  category: r.category,
+  locationArea: r.location_area,
+  description: r.description,
+  hoursOpen: r.hours_open,
+  hoursClose: r.hours_close,
+  rating: r.rating,
+  reviews: r.review_count,
+  phone: r.phone,
+  preorderEnabled: r.preorder_enabled,
+  coverTint: r.cover_tint,
+  logo: r.logo_url,
+  cover: r.cover_url,
+  ownerId: r.owner_id,
+  menu,
+})
 
 export function VendorProvider({ children }) {
-  const [rawVendors, setRawVendors] = useState(loadVendors)
+  const { user } = useAuth()
 
-  // Which vendor the dashboard is editing. Swap this for the logged-in vendor later.
-  const currentVendorId = useMemo(
-    () => (seedVendors.find((v) => v.preorderEnabled) ?? seedVendors[0]).id,
-    []
-  )
+  const [rawVendors, setRawVendors] = useState([]) // mapped vendors, WITHOUT the live isOpen
+  const [categories, setCategories] = useState([])
+  const [locationAreas, setLocationAreas] = useState([])
+  const [loading, setLoading] = useState(true)
 
-  // Save every change to localStorage (ignored if storage is full or blocked).
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(rawVendors))
-    } catch {
-      /* e.g. very large uploaded images: the change still works until refresh */
+  // Fetch vendors + menu_items (both public SELECT), group items under their
+  // vendor, and map snake->camel to the UI shape.
+  const loadVendors = useCallback(async () => {
+    const [vendorsRes, itemsRes] = await Promise.all([
+      supabase.from('vendors').select('*'),
+      supabase.from('menu_items').select('*'),
+    ])
+    if (vendorsRes.error) {
+      console.error('Failed to load vendors:', vendorsRes.error)
+      return
     }
-  }, [rawVendors])
+    if (itemsRes.error) {
+      console.error('Failed to load menu items:', itemsRes.error)
+      return
+    }
+    const itemsByVendor = {}
+    for (const row of itemsRes.data || []) {
+      ;(itemsByVendor[row.vendor_id] ||= []).push(mapMenuItem(row))
+    }
+    const mapped = (vendorsRes.data || []).map((v) => mapVendor(v, itemsByVendor[v.id] || []))
+    setRawVendors(mapped)
+  }, [])
+
+  // Fetch the category + location-area lookup tables.
+  const loadLookups = useCallback(async () => {
+    const [catsRes, areasRes] = await Promise.all([
+      supabase.from('categories').select('*').order('sort_order'),
+      supabase.from('location_areas').select('*').order('sort_order'),
+    ])
+    if (catsRes.error) console.error('Failed to load categories:', catsRes.error)
+    else setCategories((catsRes.data || []).map((c) => ({ id: c.id, name: c.name, image: c.image })))
+
+    if (areasRes.error) console.error('Failed to load location areas:', areasRes.error)
+    else setLocationAreas((areasRes.data || []).map((a) => ({ id: a.id, name: a.name })))
+  }, [])
+
+  useEffect(() => {
+    let active = true
+    setLoading(true)
+    Promise.all([loadVendors(), loadLookups()]).finally(() => {
+      if (active) setLoading(false)
+    })
+    return () => {
+      active = false
+    }
+  }, [loadVendors, loadLookups])
+
+  // Which vendor the dashboard is editing: the store owned by the logged-in
+  // vendor. Null when no owned store is found (Dashboard shows "Store not found").
+  const currentVendorId = useMemo(
+    () => rawVendors.find((v) => v.ownerId && v.ownerId === user?.id)?.id ?? null,
+    [rawVendors, user?.id]
+  )
 
   // Re-check "open / closed" every minute so the status stays correct.
   const [now, setNow] = useState(() => Date.now())
@@ -78,58 +137,116 @@ export function VendorProvider({ children }) {
   // Find one vendor by id.
   const getVendor = useCallback((id) => vendors.find((v) => v.id === id), [vendors])
 
-  // Helper: change one vendor and leave the others alone.
-  const patchVendor = useCallback(
-    (id, change) => setRawVendors((list) => list.map((v) => (v.id === id ? change(v) : v))),
-    []
+  // Category id -> display name (falls back to the id).
+  const categoryName = useCallback(
+    (id) => categories.find((c) => c.id === id)?.name ?? id,
+    [categories]
   )
 
   /* ---------- Edit functions (called by the vendor dashboard) ---------- */
+  /* Each issues a Supabase write (camel->snake) then re-fetches the rows.   */
+  /* owner_id / rating / review_count are NEVER sent from the client.        */
 
   // Store info: name, description, category, location, hours, phone, logo, cover.
   const updateVendorInfo = useCallback(
-    (id, info) => patchVendor(id, (v) => ({ ...v, ...info })),
-    [patchVendor]
+    async (id, info) => {
+      const patch = {}
+      if (info.name !== undefined) patch.name = info.name
+      if (info.description !== undefined) patch.description = info.description
+      if (info.category !== undefined) patch.category = info.category
+      if (info.locationArea !== undefined) patch.location_area = info.locationArea
+      if (info.hoursOpen !== undefined) patch.hours_open = info.hoursOpen
+      if (info.hoursClose !== undefined) patch.hours_close = info.hoursClose
+      if (info.phone !== undefined) patch.phone = info.phone
+      if (info.logo !== undefined) patch.logo_url = info.logo
+      if (info.cover !== undefined) patch.cover_url = info.cover
+
+      const { error } = await supabase.from('vendors').update(patch).eq('id', id)
+      if (error) {
+        console.error('Failed to update vendor info:', error)
+        return
+      }
+      await loadVendors()
+    },
+    [loadVendors]
   )
 
   // Pre-ordering on/off.
   const setPreorderEnabled = useCallback(
-    (id, on) => patchVendor(id, (v) => ({ ...v, preorderEnabled: on })),
-    [patchVendor]
+    async (id, on) => {
+      const { error } = await supabase.from('vendors').update({ preorder_enabled: on }).eq('id', id)
+      if (error) {
+        console.error('Failed to update pre-order flag:', error)
+        return
+      }
+      await loadVendors()
+    },
+    [loadVendors]
   )
 
-  // Add a new menu item, or update it if the id already exists.
+  // Add a new menu item, or update it if the (vendor_id, id) already exists.
   const saveMenuItem = useCallback(
-    (id, item) =>
-      patchVendor(id, (v) => ({
-        ...v,
-        menu: (v.menu || []).some((m) => m.id === item.id)
-          ? v.menu.map((m) => (m.id === item.id ? item : m))
-          : [...(v.menu || []), item],
-      })),
-    [patchVendor]
+    async (id, item) => {
+      const { error } = await supabase.from('menu_items').upsert({
+        vendor_id: id,
+        id: item.id,
+        name: item.name,
+        price: item.price,
+        category: item.category,
+        available: item.available,
+        description: item.desc,
+        image_url: item.image,
+      })
+      if (error) {
+        console.error('Failed to save menu item:', error)
+        return
+      }
+      await loadVendors()
+    },
+    [loadVendors]
   )
 
   // Sold out / available switch.
   const setItemAvailable = useCallback(
-    (id, itemId, available) =>
-      patchVendor(id, (v) => ({
-        ...v,
-        menu: (v.menu || []).map((m) => (m.id === itemId ? { ...m, available } : m)),
-      })),
-    [patchVendor]
+    async (id, itemId, available) => {
+      const { error } = await supabase
+        .from('menu_items')
+        .update({ available })
+        .eq('vendor_id', id)
+        .eq('id', itemId)
+      if (error) {
+        console.error('Failed to update item availability:', error)
+        return
+      }
+      await loadVendors()
+    },
+    [loadVendors]
   )
 
   // Remove a menu item.
   const deleteMenuItem = useCallback(
-    (id, itemId) =>
-      patchVendor(id, (v) => ({ ...v, menu: (v.menu || []).filter((m) => m.id !== itemId) })),
-    [patchVendor]
+    async (id, itemId) => {
+      const { error } = await supabase
+        .from('menu_items')
+        .delete()
+        .eq('vendor_id', id)
+        .eq('id', itemId)
+      if (error) {
+        console.error('Failed to delete menu item:', error)
+        return
+      }
+      await loadVendors()
+    },
+    [loadVendors]
   )
 
   const value = useMemo(
     () => ({
       vendors,
+      categories,
+      locationAreas,
+      categoryName,
+      loading,
       currentVendorId,
       getVendor,
       updateVendorInfo,
@@ -140,6 +257,10 @@ export function VendorProvider({ children }) {
     }),
     [
       vendors,
+      categories,
+      locationAreas,
+      categoryName,
+      loading,
       currentVendorId,
       getVendor,
       updateVendorInfo,
