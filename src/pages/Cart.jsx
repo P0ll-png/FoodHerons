@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import Icon from '../components/Icon'
 import { useCart } from '../context/CartContext'
 import { useVendors } from '../context/VendorContext'
@@ -16,36 +16,20 @@ const Peso = ({ value }) => (
 
 export default function Cart() {
   const { lines, count, total, setQty, vendorId, clearCart } = useCart()
-  const navigate = useNavigate()
   const { getVendor } = useVendors() // live store data (edited from the vendor dashboard)
   const vendor = vendorId ? getVendor(vendorId) : null
   const { user } = useAuth()
-  const [pickupName, setPickupName] = useState(user?.role === 'Student' ? user.name ?? '' : '')
+  const [pickupName, setPickupName] = useState(user?.role === 'student' ? user.full_name ?? '' : '')
   const [note, setNote] = useState('')
   const closed = vendor ? !vendor.isOpen || !vendor.preorderEnabled : false
 
   const placeOrder = (e) => {
     e.preventDefault()
     if (closed) return
-    // Simulate order creation — in production this hits the C# backend.
-    const orderId = `FH-${Math.floor(1000 + Math.random() * 9000)}`
-    const order = {
-      id: orderId,
-      vendorId,
-      vendorName: vendor?.name,
-      pickupName,
-      note,
-      lines: lines.map((l) => ({ name: l.item.name, qty: l.qty, price: l.item.price })),
-      total,
-      placedAt: new Date().toISOString(),
-    }
-    try {
-      sessionStorage.setItem(`order-${orderId}`, JSON.stringify(order))
-    } catch {
-      // storage blocked (private mode / full): the order page will say it can't find the order
-    }
-    clearCart()
-    navigate(`/order/${orderId}`)
+    // TODO(Phase C): POST /api/orders { vendorId, pickupName, note, lines } then navigate('/order/'+id).
+    // The client never writes orders/order_items to Supabase (RLS forbids it); the C# order service
+    // computes totals server-side and creates the order. Until it ships, keep the cart intact and
+    // tell the student order placement is coming soon (see the inline message on the confirm button).
   }
 
   if (count === 0) {
@@ -186,7 +170,12 @@ export default function Cart() {
               </p>
             )}
 
-            <button type="submit" className="btn btn--primary btn--block" disabled={closed}>
+            {/* Phase-C placeholder: order placement is handled by the C# order service, not the client. */}
+            <p className="checkout__closed" role="status">
+              Order placement is coming soon (handled by the order service). Your cart is saved.
+            </p>
+
+            <button type="submit" className="btn btn--primary btn--block" disabled>
               Confirm Pre-Order
             </button>
             <p className="checkout__fine">

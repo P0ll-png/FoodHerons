@@ -3,18 +3,13 @@ import { Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import Icon from '../components/Icon'
 import EmptyState from '../components/EmptyState'
 import VendorCard from '../components/VendorCard'
-import { vendors as ALL_VENDORS } from '../data/vendors'
 import { useAuth } from '../context/AuthContext'
 import { useVendors } from '../context/VendorContext'
-import { ACTIVE_ORDERS, PAST_ORDERS, FAVORITES, PENDING_REVIEWS, PAST_REVIEWS } from '../data/studentSample'
+import { supabase } from '../lib/supabase'
 import './Profile.css'
 
 // TODO: set these to your real logo image and routes
 const LOGO_SRC = '/images/logo.jpg'
-
-// TODO: frontend preview only. Shown when nobody is logged in so the page can be designed/viewed.
-// Delete this and restore the redirect to /login (see Profile() below) once login works.
-const PREVIEW_USER = { name: 'Student Preview', email: 'student@example.com', mobile: '', role: 'Student', avatar: '' }
 
 const phDigits = (v = '') => {
   let d = String(v).replace(/\D/g, '')
@@ -26,30 +21,6 @@ const phFormat = (d) => [d.slice(0, 3), d.slice(3, 6), d.slice(6, 10)].filter(Bo
 const phValid = (d) => /^9\d{9}$/.test(d)
 
 const initials = (name) => (name || 'Student').trim().split(/\s+/).filter(Boolean).map((w) => w[0]).slice(0, 2).join('').toUpperCase() || 'S'
-
-function toVendor(v, lookup) {
-  const fromStore = lookup?.(v.id)
-  const real = fromStore && String(fromStore.id) === String(v.id)
-    ? fromStore
-    : ALL_VENDORS.find((x) => String(x.id) === String(v.id))
-  if (real) return real
-  const [open, close] = (v.hours || '').split(/\s*[-–]\s*/)
-  return {
-    id: v.id,
-    name: v.name,
-    description: v.description || '',
-    locationArea: v.locationArea || v.location || '',
-    hoursOpen: v.hoursOpen || open || '',
-    hoursClose: v.hoursClose || close || '',
-    isOpen: v.isOpen ?? v.status === 'Open',
-    rating: v.rating ?? '—',
-    reviews: v.reviews ?? 0,
-    preorderEnabled: v.preorderEnabled ?? !!v.preOrder,
-    coverTint: v.coverTint || 'var(--orange-soft)',
-    category: v.category ?? v.tag,
-    cover: v.cover,
-  }
-}
 
 /* ---------- small pieces ---------- */
 
@@ -115,7 +86,7 @@ function Header({ user, view, onOpen, onProfile, onGo }) {
       </nav>
 
       <button type="button" className={`pf-me ${inActivity ? '' : 'is-on'}`} onClick={onProfile} aria-label="Your profile">
-        {user.avatar ? <img src={user.avatar} alt="" /> : initials(user.name)}
+        {user.avatar_url ? <img src={user.avatar_url} alt="" /> : initials(user.full_name)}
       </button>
     </header>
   )
@@ -129,11 +100,11 @@ function Overview({ user, onEdit, onSettings, onLogout }) {
       <Heading title="Your Profile" text="Manage your student account." />
       <div className="pf-profile">
         <section className="pf-card pf-identity">
-          <Photo src={user.avatar} className="pf-photo--avatar" />
-          <h2 className="pf-identity__name">{user.name || 'Student'}</h2>
+          <Photo src={user.avatar_url} className="pf-photo--avatar" />
+          <h2 className="pf-identity__name">{user.full_name || 'Student'}</h2>
           <p className="pf-identity__mail">
             <span>{user.email}</span>
-            <span className="pf-badge">{user.role || 'Student'}</span>
+            <span className="pf-badge">{user.role || 'student'}</span>
           </p>
           <button type="button" className="pf-btn pf-btn--soft pf-btn--wide" onClick={onEdit}>Edit Profile</button>
         </section>
@@ -169,7 +140,7 @@ function Overview({ user, onEdit, onSettings, onLogout }) {
 
 function EditProfile({ user, updateUser, onBack }) {
   const fileRef = useRef(null)
-  const [form, setForm] = useState({ name: user.name || '', email: user.email || '', mobile: user.mobile || '' })
+  const [form, setForm] = useState({ name: user.full_name || '', email: user.email || '', mobile: user.mobile || '' })
   const [photo, setPhoto] = useState(null) 
   const [err, setErr] = useState('')
   const [photoMenu, setPhotoMenu] = useState(false)
@@ -189,7 +160,7 @@ function EditProfile({ user, updateUser, onBack }) {
   }
 
 
-  const original = useRef({ name: user.name, email: user.email, mobile: user.mobile, avatar: user.avatar })
+  const original = useRef({ name: user.full_name, email: user.email, mobile: user.mobile, avatar: user.avatar_url })
   const firstRun = useRef(true)
   const initialForm = useRef(form)
   const dirty = JSON.stringify(form) !== JSON.stringify(initialForm.current) || photo !== null
@@ -218,7 +189,7 @@ function EditProfile({ user, updateUser, onBack }) {
     }
   }, [photoMenu])
 
-  const shownPhoto = photo !== null ? photo : user.avatar
+  const shownPhoto = photo !== null ? photo : user.avatar_url
   const discard = () => { updateUser(original.current); onBack() }
 
   const onPhoto = (e) => {
@@ -330,9 +301,9 @@ const STATUS_PILL = {
   Completed: 'completed',
 }
 
-function Orders({ onReorder }) {
+function Orders({ active, past, onReorder }) {
   const [tab, setTab] = useState('past')
-  const list = tab === 'active' ? ACTIVE_ORDERS : PAST_ORDERS
+  const list = tab === 'active' ? active : past
   return (
     <>
       <Heading title="My Orders" text="Track active deliveries, view past meals, and quickly reorder your favorites." />
@@ -380,16 +351,18 @@ function Orders({ onReorder }) {
 // Uses the same VendorCard as the browse pages. The heart is filled; clicking it removes the favorite.
 function Favorites({ items, onRemove }) {
   const { getVendor } = useVendors()
+  // items is a list of vendor_id strings; resolve each to a vendor row for the card.
+  const resolved = items.map((vid) => getVendor(vid)).filter(Boolean)
   return (
     <>
       <Heading title="My Favorites" text="Your go-to meals and favorite campus stalls, ready to order in one tap." />
-      {!items.length ? (
+      {!resolved.length ? (
         <EmptyState icon="heart" title="No favorites yet" text="Tap the heart on a stall to keep it close for next time." action={{ label: 'Discover stalls', to: '/' }} />
       ) : (
         <ul className="pf-grid">
-          {items.map((v) => (
+          {resolved.map((v) => (
             <li key={v.id}>
-              <VendorCard vendor={toVendor(v, getVendor)} showLogo={false} isFavorite onToggleFavorite={(id, next) => { if (!next) onRemove(id) }} />
+              <VendorCard vendor={v} showLogo={false} isFavorite onToggleFavorite={(id, next) => { if (!next) onRemove(id) }} />
             </li>
           ))}
         </ul>
@@ -433,21 +406,27 @@ function Modal({ title, onClose, children }) {
   )
 }
 
-function Reviews({ pending, past, setPending, setPast }) {
+function Reviews({ pending, past, onSubmitReview }) {
   const [editing, setEditing] = useState(null)
-  const today = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  const [error, setError] = useState('')
   const writing = pending.find((p) => p.id === editing) // the order whose "Write a review" popup is open
-  const changing = past.find((p) => p.id === editing)     // the review whose "Edit" popup is open
 
-  const savePending = (p, data) => {
-    setPast((l) => [{ id: `r-${p.id}`, vendor: p.vendor, image: p.image, date: today, ...data }, ...l])
-    setPending((l) => l.filter((x) => x.id !== p.id)); setEditing(null)
+  // Submit a review for a completed order: insert {vendor_id, order_id, rating, text} only.
+  const savePending = async (p, data) => {
+    setError('')
+    try {
+      await onSubmitReview(p, data)
+      setEditing(null)
+    } catch (err) {
+      setError(err?.message || 'Could not submit your review. Please try again.')
+    }
   }
-  const savePast = (r, data) => { setPast((l) => l.map((x) => (x.id === r.id ? { ...x, ...data } : x))); setEditing(null) }
 
   return (
     <>
       <Heading title="My Reviews" text="Share your dining experiences and help fellow students find the best meals on campus." />
+
+      {error && <p className="pf-msg" role="alert">{error}</p>}
 
       <div className="pf-panel">
         <h2 className="pf-sub">Pending</h2>
@@ -483,7 +462,6 @@ function Reviews({ pending, past, setPending, setPast }) {
                     <h3>{r.vendor}</h3>
                     <span className="pf-review__meta">
                       <span className="pf-muted">{r.date}</span>
-                      <button type="button" className="pf-btn pf-btn--outline pf-btn--sm" onClick={() => setEditing(r.id)}>Edit</button>
                     </span>
                   </div>
                   <Stars value={r.rating} />
@@ -494,19 +472,6 @@ function Reviews({ pending, past, setPending, setPast }) {
           </ul>
         )}
       </div>
-
-      {changing && (
-        <Modal title="Edit Review" onClose={() => setEditing(null)}>
-          <div className="pf-modal__top">
-            <Photo src={changing.image} className="pf-photo--thumb pf-photo--modal" />
-            <div className="pf-modal__who">
-              <h3>{changing.vendor}</h3>
-              <p>Reviewed on {changing.date}</p>
-            </div>
-          </div>
-          <ReviewForm write initial={changing} onSave={(d) => savePast(changing, d)} onCancel={() => setEditing(null)} />
-        </Modal>
-      )}
 
       {writing && (
         <Modal title="Write a Review" onClose={() => setEditing(null)}>
@@ -627,8 +592,9 @@ function AccountSettings({ onBack, onDeleted, changePassword, deleteAccount }) {
     if (form.next !== form.confirm) return setErr('The new passwords do not match.')
     setBusy(true)
     try {
-      // TODO: connect your API. Pass logoutOthers so other devices are signed out.
-      if (changePassword) await changePassword({ current: form.current, next: form.next, logoutOthers: others })
+      // Supabase updateUser only needs the new password; the current-password field stays
+      // in the UI as a confirmation prompt. (logoutOthers isn't supported by the client SDK.)
+      if (changePassword) await changePassword({ next: form.next })
       setForm(blank)
       setOk('Password updated.')
     } catch (error) {
@@ -721,18 +687,125 @@ function AccountSettings({ onBack, onDeleted, changePassword, deleteAccount }) {
 
 /* ---------- Page ---------- */
 
+// DB status -> the pill label the Orders list renders (STATUS_PILL keys).
+const DB_STATUS_LABEL = {
+  pending: 'Pending',
+  preparing: 'Preparing', // the OrderStatus page shows this as "Accepted"
+  ready: 'Ready',
+  completed: 'Completed',
+  cancelled: 'Canceled',
+}
+const ACTIVE_STATUSES = ['pending', 'preparing', 'ready']
+
 export default function Profile() {
   const auth = useAuth()
-  const user = auth.user || PREVIEW_USER
+  const user = auth.user
   const { updateUser, logout } = auth
   const navigate = useNavigate()
+  const { getVendor } = useVendors()
   const [params, setParams] = useSearchParams()
-  const [favorites, setFavorites] = useState(FAVORITES)
-  const [pending, setPending] = useState(PENDING_REVIEWS)
-  const [past, setPast] = useState(PAST_REVIEWS)
+  const [orders, setOrders] = useState([]) // adapted order rows (both active + past)
+  const [favorites, setFavorites] = useState([]) // list of vendor_id strings
+  const [pending, setPending] = useState([]) // completed orders with no review yet
+  const [past, setPast] = useState([]) // submitted reviews
 
-  // if (!auth.user) return <Navigate to="/login" replace />   // re-enable once login works
-  if (user.role === 'Vendor') return <Navigate to="/dashboard" replace />
+  const userId = user?.id
+
+  // Load this student's orders, favorites and reviews (all RLS-scoped to auth.uid()).
+  useEffect(() => {
+    if (!userId) return
+    let active = true
+
+    const vendorLabel = (vid) => getVendor(vid)?.name ?? 'Vendor'
+
+    ;(async () => {
+      const [ordersRes, favRes, reviewsRes] = await Promise.all([
+        supabase
+          .from('orders')
+          .select('id, code, vendor_id, status, total, placed_at, order_items(name, qty, unit_price)')
+          .eq('student_id', userId)
+          .order('placed_at', { ascending: false }),
+        supabase.from('favorites').select('vendor_id').eq('student_id', userId),
+        supabase.from('reviews').select('id, vendor_id, rating, text, created_at, ordered_summary').eq('student_id', userId),
+      ])
+      if (!active) return
+
+      if (ordersRes.error) console.error('Failed to load orders:', ordersRes.error)
+      if (favRes.error) console.error('Failed to load favorites:', favRes.error)
+      if (reviewsRes.error) console.error('Failed to load reviews:', reviewsRes.error)
+
+      const orderRows = ordersRes.data ?? []
+      const adapted = orderRows.map((o) => ({
+        id: o.code,
+        uuid: o.id,
+        vendorId: o.vendor_id,
+        vendor: vendorLabel(o.vendor_id),
+        status: DB_STATUS_LABEL[o.status] ?? o.status,
+        rawStatus: o.status,
+        total: o.total,
+        date: o.placed_at ? new Date(o.placed_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '',
+        items: (o.order_items ?? []).map((oi) => ({ qty: oi.qty, name: oi.name })),
+        image: undefined,
+      }))
+      setOrders(adapted)
+
+      setFavorites((favRes.data ?? []).map((f) => f.vendor_id))
+
+      const reviews = reviewsRes.data ?? []
+      setPast(
+        reviews.map((r) => ({
+          id: r.id,
+          vendor: vendorLabel(r.vendor_id),
+          date: r.created_at ? new Date(r.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '',
+          rating: r.rating,
+          text: r.text,
+          image: undefined,
+        }))
+      )
+
+      // Pending = completed orders that don't yet have a matching review row.
+      const reviewedOrderIds = new Set(reviews.map((r) => r.order_id).filter(Boolean))
+      setPending(
+        orderRows
+          .filter((o) => o.status === 'completed' && !reviewedOrderIds.has(o.id))
+          .map((o) => ({
+            id: o.code,
+            orderId: o.id,
+            vendorId: o.vendor_id,
+            vendor: vendorLabel(o.vendor_id),
+            image: undefined,
+          }))
+      )
+    })()
+
+    return () => { active = false }
+  }, [userId, getVendor])
+
+  // Redirect to login when signed out (wait for the auth check to finish to avoid flicker).
+  if (!auth.loading && !auth.user) return <Navigate to="/login" replace />
+  if (user?.role === 'vendor') return <Navigate to="/dashboard" replace />
+  if (!user) return null
+
+  const activeOrders = orders.filter((o) => ACTIVE_STATUSES.includes(o.rawStatus))
+  const pastOrders = orders.filter((o) => o.rawStatus === 'completed' || o.rawStatus === 'cancelled')
+
+  // Remove a favorite in Supabase, then drop it from local state.
+  const removeFavorite = async (vendorId) => {
+    const { error } = await supabase.from('favorites').delete().eq('student_id', userId).eq('vendor_id', vendorId)
+    if (error) { console.error('Failed to remove favorite:', error); return }
+    setFavorites((l) => l.filter((id) => id !== vendorId))
+  }
+
+  // Insert a review (only {vendor_id, order_id, rating, text}); on success move pending -> past.
+  const submitReview = async (p, { rating, text }) => {
+    const { error } = await supabase
+      .from('reviews')
+      .insert({ vendor_id: p.vendorId, order_id: p.orderId, rating, text })
+    if (error) throw error
+    const today = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    setPast((l) => [{ id: `r-${p.orderId}`, vendor: p.vendor, image: p.image, date: today, rating, text }, ...l])
+    setPending((l) => l.filter((x) => x.id !== p.id))
+  }
 
   const view = params.get('view')
   const open = (v) => setParams({ view: v })
@@ -742,9 +815,9 @@ export default function Profile() {
   const views = {
     edit: <EditProfile user={user} updateUser={updateUser} onBack={close} />,
     settings: <AccountSettings onBack={close} onDeleted={leave} changePassword={auth.changePassword} deleteAccount={auth.deleteAccount} />,
-    orders: <Orders onReorder={(id) => navigate(`/vendor/${id}`)} />,
-    favorites: <Favorites items={favorites} onRemove={(id) => setFavorites((l) => l.filter((v) => v.id !== id))} />,
-    reviews: <Reviews pending={pending} past={past} setPending={setPending} setPast={setPast} />,
+    orders: <Orders active={activeOrders} past={pastOrders} onReorder={(id) => navigate(`/vendor/${id}`)} />,
+    favorites: <Favorites items={favorites} onRemove={removeFavorite} />,
+    reviews: <Reviews pending={pending} past={past} onSubmitReview={submitReview} />,
   }
 
   return (

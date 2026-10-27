@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { Link, useParams } from 'react-router-dom'
 import Icon from '../components/Icon'
-import { useVendors } from '../context/VendorContext' 
+import { useVendors } from '../context/VendorContext'
+import { supabase } from '../lib/supabase'
 import './OrderStatus.css'
 
 const Peso = ({ value }) => (
@@ -69,36 +70,103 @@ const STATE_UI = {
   },
 }
 
-// Read the saved order (null if it is missing or the storage is unreadable).
-function loadOrder(id) {
-  try {
-    const raw = sessionStorage.getItem(`order-${id}`)
-    return raw ? JSON.parse(raw) : null
-  } catch {
-    return null
+// Map the DB order status to the UI step key (the tracker has no separate
+// 'preparing' step — a preparing order is shown as 'accepted').
+const DB_STATUS_TO_STEP = {
+  pending: 'pending',
+  preparing: 'accepted',
+  ready: 'ready',
+  completed: 'completed',
+}
+
+// Small rating + comment form shown on the completed state.
+function ReviewForm({ onSubmit }) {
+  const [rating, setRating] = useState(0)
+  const [text, setText] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [done, setDone] = useState(false)
+  const [error, setError] = useState('')
+
+  if (done) return <p className="order-review__done" role="status">Thanks for your review!</p>
+
+  const submit = async (e) => {
+    e.preventDefault()
+    if (!rating) return setError('Pick a star rating first.')
+    setBusy(true)
+    setError('')
+    try {
+      await onSubmit({ rating, text: text.trim() })
+      setDone(true)
+    } catch (err) {
+      setError(err?.message || 'Could not submit your review. Please try again.')
+      setBusy(false)
+    }
   }
+
+  return (
+    <form className="order-review" onSubmit={submit}>
+      <span className="order-review__stars" role="radiogroup" aria-label={`${rating} out of 5 stars`}>
+        {[1, 2, 3, 4, 5].map((n) => (
+          <button key={n} type="button" role="radio" aria-checked={n === rating}
+            aria-label={`${n} star${n > 1 ? 's' : ''}`} onClick={() => setRating(n)}>
+            <Icon name={n <= rating ? 'star' : 'starOutline'} size={22} />
+          </button>
+        ))}
+      </span>
+      <textarea rows={3} value={text} onChange={(e) => setText(e.target.value)}
+        placeholder="How was the food and pickup? (optional)" maxLength={280} />
+      {error && <p className="order-review__error" role="alert">{error}</p>}
+      <button type="submit" className="order-btn order-btn--primary" disabled={busy}>
+        {busy ? 'Submitting…' : 'Submit review'}
+      </button>
+    </form>
+  )
 }
 
 export default function OrderStatus() {
   const { id } = useParams()
-  const navigate = useNavigate()
-  const { getVendor, vendors } = useVendors()
-  const order = useMemo(() => loadOrder(id), [id])
-  const [stepIndex, setStepIndex] = useState(0)
-  const [showCancel, setShowCancel] = useState(false) 
+  const { getVendor } = useVendors()
+  const [order, setOrder] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [showReview, setShowReview] = useState(false)
 
+  // Load the real order (RLS lets a student read only their own orders).
   useEffect(() => {
-    if (stepIndex >= STEPS.length - 1) return
-    const t = setTimeout(() => setStepIndex((i) => i + 1), 3500)
-    return () => clearTimeout(t)
-  }, [stepIndex])
+    let active = true
+    setLoading(true)
+    supabase
+      .from('orders')
+      .select('id, code, vendor_id, status, total, pickup_name, note, order_items(name, qty, unit_price)')
+      .eq('id', id)
+      .single()
+      .then(({ data, error }) => {
+        if (!active) return
+        if (error || !data) {
+          setOrder(null)
+        } else {
+          setOrder({
+            uuid: data.id,
+            id: data.code,
+            vendorId: data.vendor_id,
+            status: data.status,
+            total: data.total,
+            pickupName: data.pickup_name,
+            note: data.note,
+            lines: (data.order_items ?? []).map((oi) => ({ name: oi.name, qty: oi.qty, price: oi.unit_price })),
+          })
+        }
+        setLoading(false)
+      })
+    return () => { active = false }
+  }, [id])
 
-  useEffect(() => {
-    if (!showCancel) return
-    const onKey = (e) => e.key === 'Escape' && setShowCancel(false)
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [showCancel])
+  if (loading) {
+    return (
+      <div className="container section">
+        <p className="text-muted">Loading order…</p>
+      </div>
+    )
+  }
 
   if (!order) {
     return (
@@ -107,7 +175,7 @@ export default function OrderStatus() {
           <span className="cart-empty__emoji" aria-hidden="true">📦</span>
           <h1>Order not found</h1>
           <p className="text-muted">
-            We couldn't find order {id}. It may have expired this session.
+            We couldn't find order {id}, or it isn't yours to view.
           </p>
           <Link to="/" className="btn btn--primary mt-4">Back to vendors</Link>
         </div>
@@ -116,27 +184,29 @@ export default function OrderStatus() {
   }
 
   /* ---------- Derived values ---------- */
+  // A cancelled order has no tracker step; show it as pending-looking but blocked.
+  const stepKey = DB_STATUS_TO_STEP[order.status] ?? 'pending'
+  const stepIndex = Math.max(0, STEPS.findIndex((s) => s.key === stepKey))
   const current = STEPS[stepIndex]
   const ui = STATE_UI[current.key]
   const isPending = current.key === 'pending'
   const isCompleted = current.key === 'completed'
 
-  // Vendor record gives us location + hours (prefer id, fall back to name).
-  const vendor =
-    (order.vendorId && getVendor(order.vendorId)) ||
-    vendors.find((v) => v.name === order.vendorName)
+  // Vendor record gives us location + hours.
+  const vendor = order.vendorId && getVendor(order.vendorId)
+  const vendorName = vendor?.name ?? 'the vendor'
+  const orderForUi = { ...order, vendorName }
 
-  // Reorder goes back to the vendor's store (adjust the route to yours).
+  // Reorder goes back to the vendor's store.
   const reorderTo = vendor ? `/vendor/${vendor.id}` : '/'
 
-  // Runs after the student confirms in the popup.
-  const handleCancel = () => {
-    try {
-      sessionStorage.removeItem(`order-${id}`)
-    } catch {
-    }
-    setShowCancel(false)
-    navigate('/')
+  // Submit a review for this completed order. The client sends ONLY these four fields;
+  // student_id/author_name/ordered_summary are filled by the DB trigger.
+  const submitReview = async ({ rating, text }) => {
+    const { error } = await supabase
+      .from('reviews')
+      .insert({ vendor_id: order.vendorId, order_id: order.uuid, rating, text })
+    if (error) throw error
   }
 
   const handleContact = () => {
@@ -156,7 +226,7 @@ export default function OrderStatus() {
             <Icon name={ui.icon} size={26} /> 
           </span>
           <h1>{ui.title}</h1>
-          <p className="order-confirm__sub">{ui.subtitle(order)}</p>
+          <p className="order-confirm__sub">{ui.subtitle(orderForUi)}</p>
         </header>
 
         {/* ---------- Order status card (wide, full width) ---------- */}
@@ -214,7 +284,7 @@ export default function OrderStatus() {
               <li>
                 <Icon name="pin" size={16} />
                 <span>
-                  {order.vendorName}
+                  {vendorName}
                   {vendor?.locationArea && `, ${vendor.locationArea}`}
                 </span>
               </li>
@@ -261,16 +331,24 @@ export default function OrderStatus() {
               <strong className="order-receipt__total-amt"><Peso value={order.total} /></strong>
             </div>
 
-            {/* Actions: Pending = Cancel, Accepted/Ready = Contact, Completed = Reorder + Review */}
+            {/* Actions: Pending = Cancel (Phase-C placeholder), Accepted/Ready = Contact, Completed = Reorder + Review */}
             <div className="order-actions">
               {isPending && (
-                <button
-                  type="button"
-                  className="order-btn order-btn--outline order-btn--block"
-                  onClick={() => setShowCancel(true)}
-                >
-                  Cancel order
-                </button>
+                <>
+                  {/* TODO(Phase C): POST /api/orders/{id}/transition {to:'cancelled'} — the client
+                      must NOT write order status to Supabase (RLS forbids it; it's the order service's job). */}
+                  <button
+                    type="button"
+                    className="order-btn order-btn--outline order-btn--block"
+                    disabled
+                    title="Cancelling an order will be handled by the order service (coming soon)."
+                  >
+                    Cancel order
+                  </button>
+                  <p className="order-confirm__sub" role="status">
+                    Need to cancel? That's handled by the order service and is coming soon.
+                  </p>
+                </>
               )}
 
               {!isPending && !isCompleted && (
@@ -289,16 +367,17 @@ export default function OrderStatus() {
                     <Link to={reorderTo} className="order-btn order-btn--primary">
                       Reorder
                     </Link>
-                    <button
-                      type="button"
-                      className="order-btn order-btn--outline"
-                      onClick={() => {
-                        /* TODO: open your review modal / route here */
-                      }}
-                    >
-                      Leave a review
-                    </button>
+                    {!showReview && (
+                      <button
+                        type="button"
+                        className="order-btn order-btn--outline"
+                        onClick={() => setShowReview(true)}
+                      >
+                        Leave a review
+                      </button>
+                    )}
                   </div>
+                  {showReview && <ReviewForm onSubmit={submitReview} />}
                   <Link to="/" className="order-another">
                     Order from another vendor
                   </Link>
@@ -308,45 +387,6 @@ export default function OrderStatus() {
           </section>
         </div>
       </div>
-
-      {/* ---------- Cancel confirmation popup ---------- */}
-      {showCancel && (
-        <div
-          className="modal-backdrop"
-          onClick={() => setShowCancel(false)}
-        >
-          <div
-            className="modal"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="cancel-title"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2 id="cancel-title" className="modal__title">Cancel this order?</h2>
-            <p className="modal__text">
-              Order <strong>{order.id}</strong> at <strong>{order.vendorName}</strong> will
-              be removed. This can't be undone.
-            </p>
-            <div className="modal__actions">
-              <button
-                type="button"
-                className="order-btn order-btn--outline"
-                onClick={() => setShowCancel(false)}
-                autoFocus
-              >
-                Keep order
-              </button>
-              <button
-                type="button"
-                className="order-btn order-btn--primary"
-                onClick={handleCancel}
-              >
-                Yes, cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

@@ -1,37 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import Icon from '../components/Icon'
-import { categories } from '../data/vendors'
 import { useVendors } from '../context/VendorContext'
 import { useAuth } from '../context/AuthContext'
+import { supabase } from '../lib/supabase'
 import './Dashboard.css'
 
 /* ------------------------------------------------------------------ */
-/*  Placeholder data. Replace with API calls (listVendorOrders, etc.)  */
+/*  Orders are READ-ONLY from the client. Status transitions           */
+/*  (accept/ready/complete/reject) belong to the Phase-C C# order      */
+/*  service — the buttons below are placeholders, never Supabase       */
+/*  writes (RLS forbids client order writes).                          */
 /* ------------------------------------------------------------------ */
-const ago = (minutes) => Date.now() - minutes * 60000
-
-const SEED_ORDERS = [
-  { id: 'FH-4825', name: 'Rico M.', items: '1× Hotsilog', total: 60, status: 'pending', preorder: true, placedAt: ago(3) },
-  { id: 'FH-4824', name: 'Aira S.', items: '2× Tapsilog, 1× Iced Tea', total: 175, status: 'pending', preorder: true, placedAt: ago(8) },
-  { id: 'FH-4823', name: 'Dan R.', items: '1× Tapsilog', total: 75, status: 'ready', preorder: true, placedAt: ago(12) },
-  { id: 'FH-4822', name: 'Lena C.', items: '2× Tocilog', total: 140, status: 'preparing', preorder: true, placedAt: ago(18) },
-  { id: 'FH-4821', name: 'Mae T.', items: '2× Hotsilog', total: 120, status: 'completed', preorder: true, placedAt: ago(24) },
-  { id: 'FH-4820', name: 'Marco D.', items: '1× Tocilog, 2× Hotdog', total: 175, status: 'preparing', preorder: true, placedAt: ago(30) },
-  { id: 'FH-4819', name: 'Ken A.', items: '1× Tapsilog, 1× Extra Rice', total: 95, status: 'completed', preorder: true, placedAt: ago(40) },
-  { id: 'FH-4818', name: 'Jules P.', items: '3× Hotsilog, 2× Extra Rice', total: 220, status: 'ready', preorder: true, placedAt: ago(45) },
-]
-
-// daysAgo: 0 = today. Swap for a real timestamp once the backend exists.
-const SEED_HISTORY = [
-  { id: 'FH-4817', name: 'Kyla R.', items: '1× Tapsilog, 1× Extra Rice', total: 95, status: 'completed', daysAgo: 1 },
-  { id: 'FH-4816', name: 'Daniel M.', items: '2× Hotsilog', total: 120, status: 'completed', daysAgo: 1 },
-  { id: 'FH-4815', name: 'Bea T.', items: '1× Tocilog', total: 70, status: 'cancelled', reason: 'Out of stock', daysAgo: 1 },
-  { id: 'FH-4814', name: 'Carlo V.', items: '1× Tapsilog, 1× Tocilog', total: 145, status: 'completed', daysAgo: 1 },
-  { id: 'FH-4813', name: 'Nina L.', items: '3× Hotsilog, 1× Extra Rice', total: 200, status: 'completed', daysAgo: 1 },
-  { id: 'FH-4790', name: 'Paolo G.', items: '2× Tapsilog', total: 150, status: 'completed', daysAgo: 12 },
-  { id: 'FH-4702', name: 'Mika O.', items: '1× Hotsilog', total: 60, status: 'completed', daysAgo: 40 },
-]
 
 // Order of an order's life. A status can only move forward.
 const STATUS_ORDER = ['pending', 'preparing', 'ready', 'completed']
@@ -559,7 +539,7 @@ function HistoryUnavailable({ onTurnOn }) {
 /* ------------------------------------------------------------------ */
 // Menu tab. All changes go to the shared store (VendorContext), so the
 // store page and cart show them right away.
-function MenuTab({ menu, onToggle, onSave, onDelete, flash }) {
+function MenuTab({ menu, categories, onToggle, onSave, onDelete, flash }) {
   const [filter, setFilter] = useState('all')
   const [dialog, setDialog] = useState(null) // null | { item? }
 
@@ -625,13 +605,13 @@ function MenuTab({ menu, onToggle, onSave, onDelete, flash }) {
 
 
       {dialog && (
-        <ItemDialog item={dialog.item} onClose={() => setDialog(null)} onSave={save} onDelete={remove} />
+        <ItemDialog item={dialog.item} categories={categories} onClose={() => setDialog(null)} onSave={save} onDelete={remove} />
       )}
     </>
   )
 }
 
-function ItemDialog({ item, onClose, onSave, onDelete }) {
+function ItemDialog({ item, categories, onClose, onSave, onDelete }) {
   const editing = Boolean(item)
   const [form, setForm] = useState({
     name: item?.name ?? '',
@@ -794,7 +774,7 @@ function StoreAvatar({ logo, name }) {
     : <span>{initials(name) || '?'}</span>
 }
 
-function ProfileTab({ saved, onSave, preorder, flash, vendor }) {
+function ProfileTab({ saved, onSave, preorder, flash, vendor, categories }) {
 
   const [draft, setDraft] = useState(saved)
   const coverInput = useRef(null)
@@ -1124,7 +1104,7 @@ function DeleteDialog({ openCount, onExport, onClose, onConfirm }) {
 function AccountTab({ history, openCount, flash, onDeleted }) {
   const auth = useAuth()
   const user = auth?.user || {}
-  const saved = { name: user.name || '', email: user.email || '' }
+  const saved = { name: user.full_name || '', email: user.email || '' }
 
   // --- Account details (login name + email)
   const [details, setDetails] = useState(saved)
@@ -1443,22 +1423,70 @@ function TopBar({ tab, onTab, preorder, onPreorder, pendingCount, profile, onExi
 /* ------------------------------------------------------------------ */
 /*  Page shell                                                         */
 /* ------------------------------------------------------------------ */
+// Join an order's items into "2× Tapsilog, 1× Iced Tea".
+const itemsText = (rows) =>
+  (rows ?? []).map((oi) => `${oi.qty}× ${oi.name}`).join(', ')
+
+// Whole days between a timestamp and now (0 = today).
+const daysAgoFrom = (ts) => {
+  if (!ts) return 0
+  const then = new Date(ts)
+  const startOfDay = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
+  const diff = startOfDay(new Date()) - startOfDay(then)
+  return Math.max(0, Math.round(diff / 86400000))
+}
+
 export default function Dashboard() {
   const navigate = useNavigate()
   const auth = useAuth()
   const [tab, setTab] = useState('dashboard') // dashboard | orders | menu | profile | settings
-  const [orders, setOrders] = useState(SEED_ORDERS)
-  const [history, setHistory] = useState(SEED_HISTORY)
+  const [orders, setOrders] = useState([]) // active orders (read-only from Supabase)
+  const [history, setHistory] = useState([]) // completed/cancelled orders (read-only)
   const [rejecting, setRejecting] = useState(null)
   const [toast, setToast] = useState('')
 
   // Store + menu data lives in the shared VendorContext (not in this page).
-  const { currentVendorId, getVendor, updateVendorInfo, setPreorderEnabled, saveMenuItem, setItemAvailable, deleteMenuItem } = useVendors()
+  const { currentVendorId, categories, getVendor, updateVendorInfo, setPreorderEnabled, saveMenuItem, setItemAvailable, deleteMenuItem } = useVendors()
   const vendor = getVendor(currentVendorId)
   const vid = vendor?.id
   const preorder = Boolean(vendor?.preorderEnabled)
   const setPreorder = (on) => setPreorderEnabled(vid, on) // pre-order switch
   const menu = vendor?.menu ?? []
+
+  // Fetch this store's orders (read-only; RLS lets the owner read their vendor's orders).
+  useEffect(() => {
+    if (!currentVendorId) return
+    let active = true
+    supabase
+      .from('orders')
+      .select('id, code, pickup_name, status, total, placed_at, cancel_reason, order_items(name, qty)')
+      .eq('vendor_id', currentVendorId)
+      .order('placed_at', { ascending: false })
+      .then(({ data, error }) => {
+        if (!active) return
+        if (error) { console.error('Failed to load orders:', error); return }
+        const rows = data ?? []
+        const live = []
+        const done = []
+        rows.forEach((o) => {
+          const base = {
+            id: o.code,
+            name: o.pickup_name,
+            items: itemsText(o.order_items),
+            total: Number(o.total),
+            status: o.status,
+          }
+          if (o.status === 'completed' || o.status === 'cancelled') {
+            done.push({ ...base, reason: o.cancel_reason || undefined, daysAgo: daysAgoFrom(o.placed_at) })
+          } else {
+            live.push({ ...base, placedAt: Date.parse(o.placed_at) })
+          }
+        })
+        setOrders(live)
+        setHistory(done)
+      })
+    return () => { active = false }
+  }, [currentVendorId])
 
   const profile = useMemo(() => ({
     name: vendor?.name ?? '',
@@ -1481,9 +1509,12 @@ export default function Dashboard() {
   }
   useEffect(() => () => clearTimeout(toastTimer.current), [])
 
+  // Phase-C placeholder: order status transitions are owned by the C# order service.
+  // TODO(Phase C): POST /api/orders/{id}/transition {to:<status>}. This is a UI-ONLY optimistic
+  // update — it never writes order status to Supabase (RLS forbids client order writes).
   const changeStatus = (id, status) => {
     setOrders((list) => list.map((o) => (o.id === id ? { ...o, status } : o)))
-    if (status === 'completed') flash(`${id} handed over`)
+    if (status === 'completed') flash(`${id} marked handed over (saved by the order service soon)`)
   }
 
   // Orders picked up today count as completed in the dashboard history.
@@ -1492,12 +1523,15 @@ export default function Dashboard() {
     [orders, history]
   )
 
+  // Phase-C placeholder: rejecting an order is a status transition owned by the order service.
+  // TODO(Phase C): POST /api/orders/{id}/transition {to:'cancelled', reason}. UI-ONLY optimistic
+  // update — no Supabase order write.
   const reject = (id, reason) => {
     const order = orders.find((o) => o.id === id)
     setOrders((list) => list.filter((o) => o.id !== id))
     setHistory((list) => [{ ...order, status: 'cancelled', reason, daysAgo: 0 }, ...list])
     setRejecting(null)
-    flash(`${id} rejected`)
+    flash(`${id} rejected (saved by the order service soon)`)
   }
 
   const pendingCount = orders.filter((o) => o.status === 'pending').length
@@ -1542,7 +1576,7 @@ export default function Dashboard() {
             onStatus={changeStatus} onReject={setRejecting} />
         )}
         {tab === 'menu' && (
-          <MenuTab menu={menu} flash={flash}
+          <MenuTab menu={menu} categories={categories} flash={flash}
             onToggle={(itemId, on) => setItemAvailable(vid, itemId, on)}
             onSave={(item) => saveMenuItem(vid, item)}
             onDelete={(itemId) => deleteMenuItem(vid, itemId)} />
@@ -1553,7 +1587,7 @@ export default function Dashboard() {
         {tab === 'profile' && (
           <ProfileTab key={JSON.stringify({ ...profile, cover: '', logo: '' })} saved={profile}
             onSave={(info) => updateVendorInfo(vid, info)}
-            preorder={preorder} flash={flash} vendor={vendor} />
+            preorder={preorder} flash={flash} vendor={vendor} categories={categories} />
         )}
       </section>
 
