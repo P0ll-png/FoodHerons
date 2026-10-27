@@ -49,15 +49,28 @@ public static class OrdersEndpoints
             return FromDomainError(http, validationError);
 
         var vendorId = request.VendorId!;
-        var vendor = await db.GetVendorAsync(vendorId, ct);
-        if (vendor is null || !vendor.PreorderEnabled || !orderService.IsOpenNow(vendor.HoursOpen, vendor.HoursClose, DateTimeOffset.UtcNow))
-        {
-            log.LogInformation("Place-order rejected: vendor {VendorId} unavailable/closed.", vendorId);
-            return Problem(http, StatusCodes.Status409Conflict, ErrorCodes.VendorClosed, "This vendor is not accepting orders right now.");
-        }
 
+        VendorInfo? vendor;
+        IReadOnlyDictionary<string, MenuItemInfo> menu;
         var merged = OrderService.MergeLines(request);
-        var menu = await db.GetMenuItemsAsync(vendorId, merged.Keys, ct);
+        try
+        {
+            vendor = await db.GetVendorAsync(vendorId, ct);
+            if (vendor is null || !vendor.PreorderEnabled || !orderService.IsOpenNow(vendor.HoursOpen, vendor.HoursClose, DateTimeOffset.UtcNow))
+            {
+                log.LogInformation("Place-order rejected: vendor {VendorId} unavailable/closed.", vendorId);
+                return Problem(http, StatusCodes.Status409Conflict, ErrorCodes.VendorClosed, "This vendor is not accepting orders right now.");
+            }
+
+            menu = await db.GetMenuItemsAsync(vendorId, merged.Keys, ct);
+        }
+        catch (Exception ex)
+        {
+            var correlationId = http.TraceIdentifier;
+            log.LogError(ex, "Place-order DB read failure. correlationId={CorrelationId} user={UserId} vendor={VendorId}",
+                correlationId, userId, vendorId);
+            return ServerError(http, correlationId);
+        }
 
         var computed = orderService.ComputeOrder(merged, menu);
         if (!computed.IsSuccess)
