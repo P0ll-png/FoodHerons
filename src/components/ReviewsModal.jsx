@@ -4,8 +4,8 @@ import Icon from '../components/Icon'
 import './ReviewsModal.css'
 
 /* ---------------------------------------------------------------------
-   Reviews pop-up 
-   Placeholder reviews come from ../data/reviews.js.
+   Reviews pop-up
+   Reviews arrive via the `reviews` prop (fetched from Supabase by the parent).
    --------------------------------------------------------------------- */
 
 const DAY = 86400000
