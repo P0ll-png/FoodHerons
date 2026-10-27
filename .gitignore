@@ -7,6 +7,12 @@ dist-ssr
 !.vscode/extensions.json
 .env
 .env.*
+
+# Seed-script env files stay ignored (covered by .env / .env.* above),
+# but the placeholder template must be tracked. The negation MUST come after
+# the .env.* ignore line to take effect.
+!supabase/scripts/.env.example
+
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
