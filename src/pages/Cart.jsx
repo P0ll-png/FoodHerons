@@ -1,10 +1,18 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import Icon from '../components/Icon'
 import { useCart } from '../context/CartContext'
 import { useVendors } from '../context/VendorContext'
 import { useAuth } from '../context/AuthContext'
+import { postOrder } from '../lib/api'
 import './Cart.css'
+
+// Maps order-service error codes to friendly inline messages.
+const ORDER_ERROR_MESSAGE = {
+  ITEM_UNAVAILABLE: 'One of your items just became unavailable. Please review your cart and try again.',
+  VENDOR_CLOSED: 'This vendor isn’t accepting pre-orders right now.',
+  VALIDATION: 'Please check your order details and try again.',
+}
 
 const Peso = ({ value }) => (
   <span className="price">
@@ -15,21 +23,43 @@ const Peso = ({ value }) => (
 
 
 export default function Cart() {
+  const navigate = useNavigate()
   const { lines, count, total, setQty, vendorId, clearCart } = useCart()
   const { getVendor } = useVendors() // live store data (edited from the vendor dashboard)
   const vendor = vendorId ? getVendor(vendorId) : null
   const { user } = useAuth()
   const [pickupName, setPickupName] = useState(user?.role === 'student' ? user.full_name ?? '' : '')
   const [note, setNote] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState('')
   const closed = vendor ? !vendor.isOpen || !vendor.preorderEnabled : false
 
-  const placeOrder = (e) => {
+  // Place the order through the C# order service. The client sends only ids +
+  // quantities — prices and totals are computed server-side (RLS forbids the
+  // browser from writing orders/order_items). On success the cart is cleared
+  // and we jump to the live status page for the returned order UUID.
+  const placeOrder = async (e) => {
     e.preventDefault()
-    if (closed) return
-    // TODO(Phase C): POST /api/orders { vendorId, pickupName, note, lines } then navigate('/order/'+id).
-    // The client never writes orders/order_items to Supabase (RLS forbids it); the C# order service
-    // computes totals server-side and creates the order. Until it ships, keep the cart intact and
-    // tell the student order placement is coming soon (see the inline message on the confirm button).
+    if (closed || submitting) return
+    setSubmitting(true)
+    setError('')
+    try {
+      const resp = await postOrder({
+        vendorId,
+        pickupName: pickupName.trim(),
+        note: note.trim() || null,
+        items: lines.map((l) => ({ menuItemId: l.item.id, qty: l.qty })),
+      })
+      clearCart()
+      navigate('/order/' + resp.id)
+    } catch (err) {
+      setError(
+        ORDER_ERROR_MESSAGE[err?.code] ||
+          err?.message ||
+          'We couldn’t place your order. Please try again.'
+      )
+      setSubmitting(false)
+    }
   }
 
   if (count === 0) {
@@ -170,13 +200,14 @@ export default function Cart() {
               </p>
             )}
 
-            {/* Phase-C placeholder: order placement is handled by the C# order service, not the client. */}
-            <p className="checkout__closed" role="status">
-              Order placement is coming soon (handled by the order service). Your cart is saved.
-            </p>
+            {error && (
+              <p className="checkout__closed" role="alert">
+                {error}
+              </p>
+            )}
 
-            <button type="submit" className="btn btn--primary btn--block" disabled>
-              Confirm Pre-Order
+            <button type="submit" className="btn btn--primary btn--block" disabled={closed || submitting}>
+              {submitting ? 'Placing order…' : 'Confirm Pre-Order'}
             </button>
             <p className="checkout__fine">
               This reserves your order for pickup only.

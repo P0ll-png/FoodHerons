@@ -1,16 +1,17 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import Icon from '../components/Icon'
 import { useVendors } from '../context/VendorContext'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
+import { transitionOrder } from '../lib/api'
 import './Dashboard.css'
 
 /* ------------------------------------------------------------------ */
-/*  Orders are READ-ONLY from the client. Status transitions           */
-/*  (accept/ready/complete/reject) belong to the Phase-C C# order      */
-/*  service — the buttons below are placeholders, never Supabase       */
-/*  writes (RLS forbids client order writes).                          */
+/*  Orders are READ-ONLY from the client (status is read direct from   */
+/*  Supabase under RLS). Status transitions (accept/ready/complete/     */
+/*  reject) are WRITES that go only through the C# order service — the  */
+/*  client never writes orders/order_items to Supabase.                 */
 /* ------------------------------------------------------------------ */
 
 // Order of an order's life. A status can only move forward.
@@ -332,7 +333,7 @@ function OrdersTab({ orders, menu, preorder, onTurnOn, onStatus, onReject }) {
                     <button
                       type="button"
                       className={`dashboard-action dashboard-action--${o.status}`}
-                      onClick={() => onStatus(o.id, ACTION[o.status].next)}
+                      onClick={() => onStatus(o.uuid, ACTION[o.status].next)}
                     >
                       {ACTION[o.status].label}
                     </button>
@@ -369,7 +370,7 @@ function RejectDialog({ order, onCancel, onConfirm }) {
       </div>
       <div className="dashboard-modal__actions">
         <button type="button" className="dashboard-btn dashboard-btn--outline" onClick={onCancel}>Keep order</button>
-        <button type="button" className="dashboard-btn dashboard-btn--danger" onClick={() => onConfirm(order.id, reason)}>Reject order</button>
+        <button type="button" className="dashboard-btn dashboard-btn--danger" onClick={() => onConfirm(order.uuid, reason)}>Reject order</button>
       </div>
     </Modal>
   )
@@ -1454,39 +1455,38 @@ export default function Dashboard() {
   const menu = vendor?.menu ?? []
 
   // Fetch this store's orders (read-only; RLS lets the owner read their vendor's orders).
-  useEffect(() => {
+  // Returns a promise so transition handlers can refresh after a write.
+  const loadOrders = useCallback(async () => {
     if (!currentVendorId) return
-    let active = true
-    supabase
+    const { data, error } = await supabase
       .from('orders')
       .select('id, code, pickup_name, status, total, placed_at, cancel_reason, order_items(name, qty)')
       .eq('vendor_id', currentVendorId)
       .order('placed_at', { ascending: false })
-      .then(({ data, error }) => {
-        if (!active) return
-        if (error) { console.error('Failed to load orders:', error); return }
-        const rows = data ?? []
-        const live = []
-        const done = []
-        rows.forEach((o) => {
-          const base = {
-            id: o.code,
-            name: o.pickup_name,
-            items: itemsText(o.order_items),
-            total: Number(o.total),
-            status: o.status,
-          }
-          if (o.status === 'completed' || o.status === 'cancelled') {
-            done.push({ ...base, reason: o.cancel_reason || undefined, daysAgo: daysAgoFrom(o.placed_at) })
-          } else {
-            live.push({ ...base, placedAt: Date.parse(o.placed_at) })
-          }
-        })
-        setOrders(live)
-        setHistory(done)
-      })
-    return () => { active = false }
+    if (error) { console.error('Failed to load orders:', error); return }
+    const rows = data ?? []
+    const live = []
+    const done = []
+    rows.forEach((o) => {
+      const base = {
+        uuid: o.id, // real order UUID — used for status transitions via the order service
+        id: o.code, // display code (FH-000123) shown in the UI
+        name: o.pickup_name,
+        items: itemsText(o.order_items),
+        total: Number(o.total),
+        status: o.status,
+      }
+      if (o.status === 'completed' || o.status === 'cancelled') {
+        done.push({ ...base, reason: o.cancel_reason || undefined, daysAgo: daysAgoFrom(o.placed_at) })
+      } else {
+        live.push({ ...base, placedAt: Date.parse(o.placed_at) })
+      }
+    })
+    setOrders(live)
+    setHistory(done)
   }, [currentVendorId])
+
+  useEffect(() => { loadOrders() }, [loadOrders])
 
   const profile = useMemo(() => ({
     name: vendor?.name ?? '',
@@ -1509,12 +1509,23 @@ export default function Dashboard() {
   }
   useEffect(() => () => clearTimeout(toastTimer.current), [])
 
-  // Phase-C placeholder: order status transitions are owned by the C# order service.
-  // TODO(Phase C): POST /api/orders/{id}/transition {to:<status>}. This is a UI-ONLY optimistic
-  // update — it never writes order status to Supabase (RLS forbids client order writes).
-  const changeStatus = (id, status) => {
-    setOrders((list) => list.map((o) => (o.id === id ? { ...o, status } : o)))
-    if (status === 'completed') flash(`${id} marked handed over (saved by the order service soon)`)
+  // Advance an order (accept->preparing, mark ready->ready, handed over->completed)
+  // through the C# order service using the order UUID, then refresh from Supabase.
+  const changeStatus = async (uuid, status) => {
+    try {
+      await transitionOrder(uuid, { to: status })
+      await loadOrders()
+      if (status === 'completed') flash('Order marked as handed over')
+      else if (status === 'preparing') flash('Order accepted')
+      else if (status === 'ready') flash('Order marked ready for pickup')
+    } catch (err) {
+      flash(
+        err?.code === 'ILLEGAL_TRANSITION'
+          ? 'That order has already moved on — refreshing.'
+          : err?.message || 'Could not update the order. Please try again.'
+      )
+      if (err?.code === 'ILLEGAL_TRANSITION') await loadOrders()
+    }
   }
 
   // Orders picked up today count as completed in the dashboard history.
@@ -1523,15 +1534,23 @@ export default function Dashboard() {
     [orders, history]
   )
 
-  // Phase-C placeholder: rejecting an order is a status transition owned by the order service.
-  // TODO(Phase C): POST /api/orders/{id}/transition {to:'cancelled', reason}. UI-ONLY optimistic
-  // update — no Supabase order write.
-  const reject = (id, reason) => {
-    const order = orders.find((o) => o.id === id)
-    setOrders((list) => list.filter((o) => o.id !== id))
-    setHistory((list) => [{ ...order, status: 'cancelled', reason, daysAgo: 0 }, ...list])
-    setRejecting(null)
-    flash(`${id} rejected (saved by the order service soon)`)
+  // Reject an order: cancel it (with a reason) through the order service using
+  // the order UUID, then refresh from Supabase.
+  const reject = async (uuid, reason) => {
+    try {
+      await transitionOrder(uuid, { to: 'cancelled', reason })
+      await loadOrders()
+      flash('Order rejected')
+    } catch (err) {
+      flash(
+        err?.code === 'ILLEGAL_TRANSITION'
+          ? 'That order has already moved on — refreshing.'
+          : err?.message || 'Could not reject the order. Please try again.'
+      )
+      if (err?.code === 'ILLEGAL_TRANSITION') await loadOrders()
+    } finally {
+      setRejecting(null)
+    }
   }
 
   const pendingCount = orders.filter((o) => o.status === 'pending').length

@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import Icon from '../components/Icon'
 import { useVendors } from '../context/VendorContext'
 import { supabase } from '../lib/supabase'
+import { transitionOrder } from '../lib/api'
 import './OrderStatus.css'
 
 const Peso = ({ value }) => (
@@ -129,36 +130,69 @@ export default function OrderStatus() {
   const [order, setOrder] = useState(null)
   const [loading, setLoading] = useState(true)
   const [showReview, setShowReview] = useState(false)
+  const [cancelling, setCancelling] = useState(false)
+  const [cancelError, setCancelError] = useState('')
 
   // Load the real order (RLS lets a student read only their own orders).
-  useEffect(() => {
-    let active = true
-    setLoading(true)
-    supabase
+  // Status is always read straight from Supabase — only the write (cancel)
+  // goes through the order service.
+  const fetchOrder = useCallback(async () => {
+    const { data, error } = await supabase
       .from('orders')
       .select('id, code, vendor_id, status, total, pickup_name, note, order_items(name, qty, unit_price)')
       .eq('id', id)
       .single()
-      .then(({ data, error }) => {
-        if (!active) return
-        if (error || !data) {
-          setOrder(null)
-        } else {
-          setOrder({
-            uuid: data.id,
-            id: data.code,
-            vendorId: data.vendor_id,
-            status: data.status,
-            total: data.total,
-            pickupName: data.pickup_name,
-            note: data.note,
-            lines: (data.order_items ?? []).map((oi) => ({ name: oi.name, qty: oi.qty, price: oi.unit_price })),
-          })
-        }
-        setLoading(false)
-      })
-    return () => { active = false }
+    if (error || !data) return null
+    return {
+      uuid: data.id,
+      id: data.code,
+      vendorId: data.vendor_id,
+      status: data.status,
+      total: data.total,
+      pickupName: data.pickup_name,
+      note: data.note,
+      lines: (data.order_items ?? []).map((oi) => ({ name: oi.name, qty: oi.qty, price: oi.unit_price })),
+    }
   }, [id])
+
+  useEffect(() => {
+    let active = true
+    setLoading(true)
+    fetchOrder().then((o) => {
+      if (!active) return
+      setOrder(o)
+      setLoading(false)
+    })
+    return () => { active = false }
+  }, [fetchOrder])
+
+  // Student cancel: prompt for a reason, POST the transition through the order
+  // service, then refresh the order from Supabase. ILLEGAL_TRANSITION means the
+  // vendor already moved the order on (lost race).
+  const cancelOrder = async () => {
+    const reason = window.prompt('Why are you cancelling this order?')
+    if (reason === null) return // dismissed the prompt
+    const trimmed = reason.trim()
+    if (!trimmed) {
+      setCancelError('Please give a short reason for cancelling.')
+      return
+    }
+    setCancelling(true)
+    setCancelError('')
+    try {
+      await transitionOrder(order.uuid, { to: 'cancelled', reason: trimmed })
+      const refreshed = await fetchOrder()
+      if (refreshed) setOrder(refreshed)
+    } catch (err) {
+      setCancelError(
+        err?.code === 'ILLEGAL_TRANSITION'
+          ? 'This order can no longer be cancelled — the vendor has already started on it.'
+          : err?.message || 'We couldn’t cancel your order. Please try again.'
+      )
+    } finally {
+      setCancelling(false)
+    }
+  }
 
   if (loading) {
     return (
@@ -335,19 +369,17 @@ export default function OrderStatus() {
             <div className="order-actions">
               {isPending && (
                 <>
-                  {/* TODO(Phase C): POST /api/orders/{id}/transition {to:'cancelled'} — the client
-                      must NOT write order status to Supabase (RLS forbids it; it's the order service's job). */}
                   <button
                     type="button"
                     className="order-btn order-btn--outline order-btn--block"
-                    disabled
-                    title="Cancelling an order will be handled by the order service (coming soon)."
+                    onClick={cancelOrder}
+                    disabled={cancelling}
                   >
-                    Cancel order
+                    {cancelling ? 'Cancelling…' : 'Cancel order'}
                   </button>
-                  <p className="order-confirm__sub" role="status">
-                    Need to cancel? That's handled by the order service and is coming soon.
-                  </p>
+                  {cancelError && (
+                    <p className="order-review__error" role="alert">{cancelError}</p>
+                  )}
                 </>
               )}
 
