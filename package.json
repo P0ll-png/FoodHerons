@@ -6,6 +6,8 @@
   "description": "Campus food vendor discovery and pre-ordering web app for UMAK — frontend",
   "scripts": {
     "dev": "vite",
+    "dev:all": "node scripts/dev.mjs",
+    "dev:api": "node scripts/dev-api.mjs",
     "build": "vite build",
     "preview": "vite preview"
   },
