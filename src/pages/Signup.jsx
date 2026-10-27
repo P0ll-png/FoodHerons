@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext'
 import Icon from '../components/Icon'
 import AuthLayout, {
   PasswordField,
@@ -13,15 +14,15 @@ import AuthLayout, {
 
 export default function Signup() {
   const navigate = useNavigate()
+  const { signup } = useAuth()
   const [params] = useSearchParams()
   const [role, setRole] = useState(params.get('role') === 'vendor' ? 'vendor' : 'student')
   const [form, setForm] = useState({ name: '', email: '', phone: '', password: '', store: '' })
   const [error, setError] = useState('')
 
   const update = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
-  const goNext = () => navigate(role === 'vendor' ? '/dashboard' : '/')
 
-  const submit = (e) => {
+  const submit = async (e) => {
     e.preventDefault()
     if (!isValidPHMobile(form.phone)) {
       setError('Enter a valid Philippine mobile number, e.g. +63 917 123 4567.')
@@ -32,10 +33,23 @@ export default function Signup() {
       return
     }
     setError('')
-    goNext()
+    try {
+      await signup({
+        name: form.name,
+        email: form.email,
+        phone: form.phone,
+        password: form.password,
+        role,
+        store: form.store,
+      })
+      navigate(role === 'vendor' ? '/dashboard' : '/')
+    } catch (err) {
+      setError(err?.message || 'Unable to create your account. Please try again.')
+    }
   }
 
-  const signupWithFacebook = () => goNext()
+  // Facebook signup is a deferred stub.
+  const signupWithFacebook = () => {}
 
   return (
     <AuthLayout

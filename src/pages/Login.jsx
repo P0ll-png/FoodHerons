@@ -7,20 +7,21 @@ export default function Login() {
   const navigate = useNavigate()
   const { login } = useAuth()
   const [form, setForm] = useState({ email: '', password: '' })
+  const [error, setError] = useState('')
 
-  const submit = (e) => {
+  const submit = async (e) => {
     e.preventDefault()
-    // no real auth. Sign the student in so the header shows their profile.
-    const name = form.email.split('@')[0].replace(/[._-]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
-    login({ name: name || 'Student', email: form.email, role: 'Student' })
-    navigate('/')
+    setError('')
+    try {
+      await login({ email: form.email, password: form.password })
+      navigate('/')
+    } catch (err) {
+      setError(err?.message || 'Unable to log in. Check your email and password.')
+    }
   }
 
-  //replace with real Facebook Login 
-  const loginWithFacebook = () => {
-    login({ name: 'Student', email: '', role: 'Student' })
-    navigate('/')
-  }
+  // Facebook login is a deferred stub.
+  const loginWithFacebook = () => {}
 
   const update = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
 
@@ -38,6 +39,8 @@ export default function Login() {
         </div>
 
         <PasswordField placeholder="Enter your password" value={form.password} onChange={update('password')} autoComplete="current-password" />
+
+        {error && <p className="auth__error" role="alert">{error}</p>}
 
         <div className="auth__row">
           <label className="auth__check">

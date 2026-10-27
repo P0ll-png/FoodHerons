@@ -15,8 +15,8 @@ export default function Header() {
   const navigate = useNavigate()
 
   const closeMenu = () => setOpen(false)
-  const profilePath = user?.role === 'Vendor' ? '/dashboard' : '/profile'
-  const firstName = user?.name?.trim().split(/\s+/)[0]
+  const profilePath = user?.role === 'admin' ? '/admin' : user?.role === 'vendor' ? '/dashboard' : '/profile'
+  const firstName = user?.full_name?.trim().split(/\s+/)[0]
 
   return (
     <header className="header">
@@ -43,19 +43,22 @@ export default function Header() {
           <NavLink to="/" end className="nav__link" onClick={closeMenu}>
             Discover
           </NavLink>
-          <NavLink to="/dashboard" className="nav__link" onClick={closeMenu}>
-            Vendor Dashboard
-          </NavLink>
+          {user?.role === 'vendor' && (
+            <NavLink to="/dashboard" className="nav__link" onClick={closeMenu}>
+              Vendor Dashboard
+            </NavLink>
+          )}
+          {user?.role === 'admin' && (
+            <NavLink to="/admin" className="nav__link" onClick={closeMenu}>
+              Admin
+            </NavLink>
+          )}
           {user ? (
             <NavLink to={profilePath} className="nav__link nav__link--profile" onClick={closeMenu}>
               My profile
             </NavLink>
           ) : (
             <>
-              {/* TODO: frontend preview only. Remove once login works (the link then shows only when logged in) */}
-              <NavLink to="/profile" className="nav__link" onClick={closeMenu}>
-                My Profile
-              </NavLink>
               <NavLink to="/login" className="nav__link" onClick={closeMenu}>
                 Log in
               </NavLink>
@@ -72,9 +75,9 @@ export default function Header() {
               to={profilePath}
               className="profile-chip"
               onClick={closeMenu}
-              aria-label={`${user.name || 'Student'} — open profile`}
+              aria-label={`${user.full_name || 'Student'} — open profile`}
             >
-              <Avatar name={user.name} src={user.avatar} size={34} className="profile-chip__avatar" />
+              <Avatar name={user.full_name} src={user.avatar_url} size={34} className="profile-chip__avatar" />
               <span className="profile-chip__name">{firstName}</span>
             </NavLink>
           )}

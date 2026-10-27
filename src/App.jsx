@@ -1,7 +1,7 @@
-import { Routes, Route, useLocation } from 'react-router-dom'
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { ThemeProvider } from './context/ThemeContext'
 import { CartProvider } from './context/CartContext'
-import { AuthProvider } from './context/AuthContext'
+import { AuthProvider, useAuth } from './context/AuthContext'
 import { VendorProvider } from './context/VendorContext'
 import Header from './components/Header'
 import Footer from './components/Footer'
@@ -10,12 +10,36 @@ import VendorStore from './pages/VendorStore'
 import Cart from './pages/Cart'
 import OrderStatus from './pages/OrderStatus'
 import Dashboard from './pages/Dashboard'
+import Admin from './pages/Admin'
 import Login from './pages/Login'
 import Signup from './pages/Signup'
 import NotFound from './pages/NotFound'
 import ScrollToTop from './components/ScrollToTop'
 import Search from './pages/Search'
 import Profile from './pages/Profile'
+
+function AuthSplash() {
+  return (
+    <div style={{ display: 'grid', placeItems: 'center', minHeight: '40vh' }}>
+      Loading…
+    </div>
+  )
+}
+
+function RequireAuth({ children }) {
+  const { user, loading } = useAuth()
+  if (loading) return <AuthSplash />
+  if (!user) return <Navigate to="/login" replace />
+  return children
+}
+
+function RequireRole({ role, children }) {
+  const { user, loading } = useAuth()
+  if (loading) return <AuthSplash />
+  if (!user) return <Navigate to="/login" replace />
+  if (user.role !== role) return <Navigate to="/" replace />
+  return children
+}
 
 
 export default function App() {
@@ -40,10 +64,11 @@ export default function App() {
             <Route path="/" element={<Home />} />
             <Route path="/search" element={<Search />} />
             <Route path="/vendor/:id" element={<VendorStore />} />
-            <Route path="/cart" element={<Cart />} />
-            <Route path="/order/:id" element={<OrderStatus />} />
-            <Route path="/profile" element={<Profile />} />
-            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/cart" element={<RequireAuth><Cart /></RequireAuth>} />
+            <Route path="/order/:id" element={<RequireAuth><OrderStatus /></RequireAuth>} />
+            <Route path="/profile" element={<RequireRole role="student"><Profile /></RequireRole>} />
+            <Route path="/dashboard" element={<RequireRole role="vendor"><Dashboard /></RequireRole>} />
+            <Route path="/admin" element={<RequireRole role="admin"><Admin /></RequireRole>} />
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
             <Route path="*" element={<NotFound />} />

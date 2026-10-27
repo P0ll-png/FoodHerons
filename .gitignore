@@ -7,6 +7,7 @@ dist-ssr
 !.vscode/extensions.json
 .env
 .env.*
+!.env.example
 
 # Seed-script env files stay ignored (covered by .env / .env.* above),
 # but the placeholder template must be tracked. The negation MUST come after
