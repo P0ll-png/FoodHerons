@@ -1,5 +1,7 @@
+using System.Net.Http.Json;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using FoodHerons.Api.Services;
-using Npgsql;
 
 namespace FoodHerons.Api.Data;
 
@@ -37,37 +39,38 @@ public sealed record OrderRow(
 public sealed record OrderItemInput(string MenuItemId, string VendorId, string Name, decimal UnitPrice, int Qty);
 
 /// <summary>
-/// The Npgsql-backed data layer. Connects with the service-role connection string
-/// (ConnectionStrings:Postgres) and therefore bypasses RLS. All SQL is parameterized.
+/// The Supabase-backed data layer. Talks to the Supabase project over HTTPS (443)
+/// via a typed <see cref="HttpClient"/> whose <c>BaseAddress</c> is
+/// <c>${Supabase:Url}/rest/v1/</c> and whose <c>apikey</c>/<c>Authorization: Bearer</c>
+/// headers carry the service-role key (so RLS is bypassed, matching the old
+/// service-role connection). Reads (<see cref="GetVendorAsync"/>,
+/// <see cref="GetMenuItemsAsync"/>, <see cref="GetOrderStateAsync"/>) are PostgREST
+/// GETs; the two transactional writes are Postgres RPCs invoked over
+/// <c>POST /rest/v1/rpc/...</c>: <c>place_order</c> (atomic orders + order_items insert)
+/// and <c>transition_order</c> (locked read + guarded status/timestamp update).
 ///
 /// Pure order logic lives in <see cref="OrderService"/>; this class only moves rows.
-/// It compiles and is constructable with no live DB (connections open lazily per call).
+/// It never forwards Supabase response bodies to callers: a non-2xx on a read or an
+/// insert throws a sanitized exception the endpoint turns into a clean 500, and a
+/// transition maps the RPC's <c>FH001</c>/<c>FH002</c> code to a <see cref="DomainError"/>.
 /// </summary>
-public sealed class Db(NpgsqlDataSource dataSource)
+public sealed class Db(HttpClient http)
 {
-    private readonly NpgsqlDataSource _dataSource = dataSource;
+    private readonly HttpClient _http = http;
+
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     /// <summary>Loads a vendor's placement-relevant fields, or null if it does not exist.</summary>
     public async Task<VendorInfo?> GetVendorAsync(string vendorId, CancellationToken ct)
     {
-        const string sql = """
-            select id, owner_id, preorder_enabled, hours_open, hours_close
-            from public.vendors
-            where id = @vendor_id
-            """;
+        var url = $"vendors?id=eq.{Uri.EscapeDataString(vendorId)}" +
+                  "&select=id,owner_id,preorder_enabled,hours_open,hours_close&limit=1";
 
-        await using var cmd = _dataSource.CreateCommand(sql);
-        cmd.Parameters.AddWithValue("vendor_id", vendorId);
+        var rows = await GetArrayAsync<VendorDto>(url, ct);
+        if (rows.Count == 0) return null;
 
-        await using var reader = await cmd.ExecuteReaderAsync(ct);
-        if (!await reader.ReadAsync(ct)) return null;
-
-        return new VendorInfo(
-            reader.GetString(0),
-            reader.IsDBNull(1) ? null : reader.GetGuid(1),
-            reader.GetBoolean(2),
-            reader.GetString(3),
-            reader.GetString(4));
+        var v = rows[0];
+        return new VendorInfo(v.Id, v.OwnerId, v.PreorderEnabled, v.HoursOpen, v.HoursClose);
     }
 
     /// <summary>
@@ -81,29 +84,26 @@ public sealed class Db(NpgsqlDataSource dataSource)
         var result = new Dictionary<string, MenuItemInfo>(StringComparer.Ordinal);
         if (ids.Length == 0) return result;
 
-        const string sql = """
-            select id, name, price, available
-            from public.menu_items
-            where vendor_id = @vendor_id and id = any(@ids)
-            """;
+        // PostgREST in.(...) treats commas as separators; wrap each id in double
+        // quotes and backslash-escape embedded " and \ so reserved characters are
+        // safe, then URL-escape the whole quoted token.
+        var inList = string.Join(",", ids.Select(QuoteInValue));
 
-        await using var cmd = _dataSource.CreateCommand(sql);
-        cmd.Parameters.AddWithValue("vendor_id", vendorId);
-        cmd.Parameters.AddWithValue("ids", ids);
+        var url = $"menu_items?vendor_id=eq.{Uri.EscapeDataString(vendorId)}" +
+                  $"&id=in.({inList})&select=id,name,price,available";
 
-        await using var reader = await cmd.ExecuteReaderAsync(ct);
-        while (await reader.ReadAsync(ct))
-        {
-            var id = reader.GetString(0);
-            result[id] = new MenuItemInfo(id, reader.GetString(1), reader.GetDecimal(2), reader.GetBoolean(3));
-        }
+        var rows = await GetArrayAsync<MenuItemDto>(url, ct);
+        foreach (var row in rows)
+            result[row.Id] = new MenuItemInfo(row.Id, row.Name, row.Price, row.Available);
+
         return result;
     }
 
     /// <summary>
-    /// Inserts an order + its items in a single transaction. The DB assigns the
-    /// human-friendly <c>code</c> (sequence default) and <c>placed_at</c>; we omit
-    /// both and use RETURNING. Status defaults to 'pending'.
+    /// Inserts an order + its items in a single transaction via the <c>place_order</c>
+    /// RPC. The DB assigns the human-friendly <c>code</c> (sequence default),
+    /// <c>placed_at</c>, and the default <c>pending</c> status; the RPC returns the new
+    /// orders row as a single JSON object deserialized directly into <see cref="OrderRow"/>.
     /// </summary>
     public async Task<OrderRow> InsertOrderAsync(
         Guid studentId,
@@ -115,108 +115,50 @@ public sealed class Db(NpgsqlDataSource dataSource)
         IReadOnlyList<OrderItemInput> items,
         CancellationToken ct)
     {
-        await using var conn = await _dataSource.OpenConnectionAsync(ct);
-        await using var tx = await conn.BeginTransactionAsync(ct);
+        var body = new PlaceOrderRpcBody(
+            studentId,
+            vendorId,
+            subtotal,
+            total,
+            pickupName,
+            note,
+            items.Select(i => new PlaceOrderRpcItem(i.MenuItemId, i.VendorId, i.Name, i.UnitPrice, i.Qty)).ToArray());
 
-        Guid orderId;
-        string code;
-        DateTimeOffset placedAt;
+        using var response = await _http.PostAsJsonAsync("rpc/place_order", body, JsonOptions, ct);
+        if (!response.IsSuccessStatusCode)
+            throw Fatal("place_order", response.StatusCode);
 
-        const string insertOrder = """
-            insert into public.orders (student_id, vendor_id, subtotal, total, pickup_name, note)
-            values (@student_id, @vendor_id, @subtotal, @total, @pickup_name, @note)
-            returning id, code, placed_at
-            """;
-
-        await using (var cmd = new NpgsqlCommand(insertOrder, conn, tx))
-        {
-            cmd.Parameters.AddWithValue("student_id", studentId);
-            cmd.Parameters.AddWithValue("vendor_id", vendorId);
-            cmd.Parameters.AddWithValue("subtotal", subtotal);
-            cmd.Parameters.AddWithValue("total", total);
-            cmd.Parameters.AddWithValue("pickup_name", pickupName);
-            cmd.Parameters.AddWithValue("note", (object?)note ?? DBNull.Value);
-
-            await using var reader = await cmd.ExecuteReaderAsync(ct);
-            await reader.ReadAsync(ct);
-            orderId = reader.GetGuid(0);
-            code = reader.GetString(1);
-            placedAt = reader.GetFieldValue<DateTimeOffset>(2);
-        }
-
-        const string insertItem = """
-            insert into public.order_items (order_id, menu_item_id, vendor_id, name, unit_price, qty)
-            values (@order_id, @menu_item_id, @vendor_id, @name, @unit_price, @qty)
-            """;
-
-        foreach (var item in items)
-        {
-            await using var cmd = new NpgsqlCommand(insertItem, conn, tx);
-            cmd.Parameters.AddWithValue("order_id", orderId);
-            cmd.Parameters.AddWithValue("menu_item_id", item.MenuItemId);
-            cmd.Parameters.AddWithValue("vendor_id", item.VendorId);
-            cmd.Parameters.AddWithValue("name", item.Name);
-            cmd.Parameters.AddWithValue("unit_price", item.UnitPrice);
-            cmd.Parameters.AddWithValue("qty", item.Qty);
-            await cmd.ExecuteNonQueryAsync(ct);
-        }
-
-        await tx.CommitAsync(ct);
-
-        return new OrderRow(orderId, code, OrderStatuses.Pending, vendorId, subtotal, total, placedAt,
-            null, null, null, null, null);
-    }
-
-    /// <summary>
-    /// Loads an order's current state under <c>FOR UPDATE</c>, or null if not found.
-    /// Used inside <see cref="ApplyTransitionAsync"/>'s transaction to tie-break races.
-    /// </summary>
-    private static async Task<OrderState?> LoadForUpdateAsync(
-        NpgsqlConnection conn, NpgsqlTransaction tx, Guid orderId, CancellationToken ct)
-    {
-        const string sql = """
-            select id, status::text, student_id, vendor_id
-            from public.orders
-            where id = @id
-            for update
-            """;
-
-        await using var cmd = new NpgsqlCommand(sql, conn, tx);
-        cmd.Parameters.AddWithValue("id", orderId);
-
-        await using var reader = await cmd.ExecuteReaderAsync(ct);
-        if (!await reader.ReadAsync(ct)) return null;
-
-        return new OrderState(reader.GetGuid(0), reader.GetString(1), reader.GetGuid(2), reader.GetString(3));
+        var row = await ReadObjectAsync<OrderRowDto>(response, "place_order", ct);
+        return ToOrderRow(row);
     }
 
     /// <summary>
     /// Loads an order's current state for pre-transition authorization/not-found checks.
-    /// This is a non-locking read; the authoritative check happens under lock inside
-    /// <see cref="ApplyTransitionAsync"/>.
+    /// This is a non-locking PostgREST read; the authoritative lost-race check happens
+    /// under <c>FOR UPDATE</c> inside the <c>transition_order</c> RPC.
     /// </summary>
     public async Task<OrderState?> GetOrderStateAsync(Guid orderId, CancellationToken ct)
     {
-        const string sql = """
-            select id, status::text, student_id, vendor_id
-            from public.orders
-            where id = @id
-            """;
+        var url = $"orders?id=eq.{Uri.EscapeDataString(orderId.ToString())}" +
+                  "&select=id,status,student_id,vendor_id&limit=1";
 
-        await using var cmd = _dataSource.CreateCommand(sql);
-        cmd.Parameters.AddWithValue("id", orderId);
+        var rows = await GetArrayAsync<OrderStateDto>(url, ct);
+        if (rows.Count == 0) return null;
 
-        await using var reader = await cmd.ExecuteReaderAsync(ct);
-        if (!await reader.ReadAsync(ct)) return null;
-
-        return new OrderState(reader.GetGuid(0), reader.GetString(1), reader.GetGuid(2), reader.GetString(3));
+        var s = rows[0];
+        return new OrderState(s.Id, s.Status, s.StudentId, s.VendorId);
     }
 
     /// <summary>
-    /// Applies a validated transition atomically: re-reads status FOR UPDATE, re-plans
-    /// against the current status (tie-break), and on success updates status + the
-    /// matching lifecycle timestamp (+ cancel_reason for cancellations). Returns the
-    /// updated row, or a <see cref="DomainError"/> if the transition became illegal.
+    /// Applies a validated transition atomically via the <c>transition_order</c> RPC,
+    /// which locks the row, re-evaluates the legal-pair whitelist under the lock, and
+    /// updates status + the matching lifecycle timestamp (+ cancel_reason on cancel).
+    /// On 2xx the returned single JSON object is the updated row. On any non-2xx the
+    /// response body's <c>code</c> field is read regardless of HTTP status (status only
+    /// 2xx-vs-not): <c>FH001</c> -&gt; ILLEGAL_TRANSITION, <c>FH002</c> -&gt; NOT_FOUND;
+    /// anything else is fatal and throws. The <paramref name="orderService"/> parameter
+    /// is retained for the endpoint call site but no longer used for planning (the
+    /// under-lock guard lives in SQL).
     /// </summary>
     public async Task<Result<OrderRow>> ApplyTransitionAsync(
         OrderService orderService,
@@ -225,68 +167,148 @@ public sealed class Db(NpgsqlDataSource dataSource)
         string? reason,
         CancellationToken ct)
     {
-        await using var conn = await _dataSource.OpenConnectionAsync(ct);
-        await using var tx = await conn.BeginTransactionAsync(ct);
+        var body = new TransitionRpcBody(orderId, to, reason);
 
-        var state = await LoadForUpdateAsync(conn, tx, orderId, ct);
-        if (state is null)
-            return Result<OrderRow>.Fail(new DomainError(404, "NOT_FOUND", "Order not found."));
+        using var response = await _http.PostAsJsonAsync("rpc/transition_order", body, JsonOptions, ct);
 
-        // Re-plan under the lock using the freshly-read status (lost-race safety).
-        var plan = orderService.PlanTransition(state.Status, to);
-        if (!plan.IsSuccess)
-            return Result<OrderRow>.Fail(plan.Error!);
-
-        var timestampColumn = to switch
+        if (response.IsSuccessStatusCode)
         {
-            OrderStatuses.Preparing => "accepted_at",
-            OrderStatuses.Ready => "ready_at",
-            OrderStatuses.Completed => "completed_at",
-            OrderStatuses.Cancelled => "cancelled_at",
-            _ => null
+            var row = await ReadObjectAsync<OrderRowDto>(response, "transition_order", ct);
+            return Result<OrderRow>.Ok(ToOrderRow(row));
+        }
+
+        // Non-2xx: map off the body `code` field, NOT the HTTP status.
+        var code = await TryReadErrorCodeAsync(response, ct);
+        return code switch
+        {
+            "FH001" => Result<OrderRow>.Fail(new DomainError(409, ErrorCodes.IllegalTransition, "That status change is not allowed.")),
+            "FH002" => Result<OrderRow>.Fail(new DomainError(404, "NOT_FOUND", "Order not found.")),
+            _ => throw Fatal("transition_order", response.StatusCode),
         };
+    }
 
-        var setClauses = new List<string> { "status = @to::public.order_status" };
-        if (timestampColumn is not null)
-            setClauses.Add($"{timestampColumn} = now()");
-        if (to == OrderStatuses.Cancelled)
-            setClauses.Add("cancel_reason = @reason");
+    // ===================================================================
+    // HTTP helpers — never surface Supabase response bodies to callers.
+    // ===================================================================
 
-        var sql = $"""
-            update public.orders
-            set {string.Join(", ", setClauses)}
-            where id = @id
-            returning id, code, status::text, vendor_id, subtotal, total,
-                      placed_at, accepted_at, ready_at, completed_at, cancelled_at, cancel_reason
-            """;
+    private async Task<IReadOnlyList<T>> GetArrayAsync<T>(string relativeUrl, CancellationToken ct)
+    {
+        using var response = await _http.GetAsync(relativeUrl, ct);
+        if (!response.IsSuccessStatusCode)
+            throw Fatal(relativeUrl, response.StatusCode);
 
-        await using (var cmd = new NpgsqlCommand(sql, conn, tx))
+        try
         {
-            cmd.Parameters.AddWithValue("id", orderId);
-            cmd.Parameters.AddWithValue("to", to);
-            if (to == OrderStatuses.Cancelled)
-                cmd.Parameters.AddWithValue("reason", (object?)reason ?? DBNull.Value);
-
-            await using var reader = await cmd.ExecuteReaderAsync(ct);
-            await reader.ReadAsync(ct);
-            var row = ReadOrderRow(reader);
-            await reader.CloseAsync();
-            await tx.CommitAsync(ct);
-            return Result<OrderRow>.Ok(row);
+            var rows = await response.Content.ReadFromJsonAsync<List<T>>(JsonOptions, ct);
+            return rows ?? [];
+        }
+        catch (JsonException)
+        {
+            throw new InvalidOperationException($"Supabase returned a malformed response for '{relativeUrl}'.");
         }
     }
 
-    private static OrderRow ReadOrderRow(NpgsqlDataReader reader) => new(
-        reader.GetGuid(0),
-        reader.GetString(1),
-        reader.GetString(2),
-        reader.GetString(3),
-        reader.GetDecimal(4),
-        reader.GetDecimal(5),
-        reader.GetFieldValue<DateTimeOffset>(6),
-        reader.IsDBNull(7) ? null : reader.GetFieldValue<DateTimeOffset>(7),
-        reader.IsDBNull(8) ? null : reader.GetFieldValue<DateTimeOffset>(8),
-        reader.IsDBNull(9) ? null : reader.GetFieldValue<DateTimeOffset>(9),
-        reader.IsDBNull(10) ? null : reader.GetFieldValue<DateTimeOffset>(10),
-        reader.IsDBNull(11) ? null : reader.GetString(11));
+    private static async Task<T> ReadObjectAsync<T>(HttpResponseMessage response, string op, CancellationToken ct)
+    {
+        try
+        {
+            var obj = await response.Content.ReadFromJsonAsync<T>(JsonOptions, ct);
+            if (obj is null)
+                throw new InvalidOperationException($"Supabase returned an empty body for '{op}'.");
+            return obj;
+        }
+        catch (JsonException)
+        {
+            throw new InvalidOperationException($"Supabase returned a malformed response for '{op}'.");
+        }
+    }
+
+    private static async Task<string?> TryReadErrorCodeAsync(HttpResponseMessage response, CancellationToken ct)
+    {
+        try
+        {
+            var error = await response.Content.ReadFromJsonAsync<PostgrestError>(JsonOptions, ct);
+            return error?.Code;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>A sanitized fatal error — carries no Supabase response body.</summary>
+    private static InvalidOperationException Fatal(string op, System.Net.HttpStatusCode status) =>
+        new($"Supabase request '{op}' failed with status {(int)status}.");
+
+    private static OrderRow ToOrderRow(OrderRowDto r) => new(
+        r.Id, r.Code, r.Status, r.VendorId, r.Subtotal, r.Total,
+        r.PlacedAt, r.AcceptedAt, r.ReadyAt, r.CompletedAt, r.CancelledAt, r.CancelReason);
+
+    private static string QuoteInValue(string id)
+    {
+        var escaped = id.Replace("\\", "\\\\").Replace("\"", "\\\"");
+        return Uri.EscapeDataString($"\"{escaped}\"");
+    }
+
+    // ===================================================================
+    // Private PostgREST payload DTOs (snake_case via Web defaults).
+    // ===================================================================
+
+    private sealed record VendorDto(
+        [property: JsonPropertyName("id")] string Id,
+        [property: JsonPropertyName("owner_id")] Guid? OwnerId,
+        [property: JsonPropertyName("preorder_enabled")] bool PreorderEnabled,
+        [property: JsonPropertyName("hours_open")] string HoursOpen,
+        [property: JsonPropertyName("hours_close")] string HoursClose);
+
+    private sealed record MenuItemDto(
+        [property: JsonPropertyName("id")] string Id,
+        [property: JsonPropertyName("name")] string Name,
+        [property: JsonPropertyName("price")] decimal Price,
+        [property: JsonPropertyName("available")] bool Available);
+
+    private sealed record OrderStateDto(
+        [property: JsonPropertyName("id")] Guid Id,
+        [property: JsonPropertyName("status")] string Status,
+        [property: JsonPropertyName("student_id")] Guid StudentId,
+        [property: JsonPropertyName("vendor_id")] string VendorId);
+
+    private sealed record OrderRowDto(
+        [property: JsonPropertyName("id")] Guid Id,
+        [property: JsonPropertyName("code")] string Code,
+        [property: JsonPropertyName("status")] string Status,
+        [property: JsonPropertyName("vendor_id")] string VendorId,
+        [property: JsonPropertyName("subtotal")] decimal Subtotal,
+        [property: JsonPropertyName("total")] decimal Total,
+        [property: JsonPropertyName("placed_at")] DateTimeOffset PlacedAt,
+        [property: JsonPropertyName("accepted_at")] DateTimeOffset? AcceptedAt,
+        [property: JsonPropertyName("ready_at")] DateTimeOffset? ReadyAt,
+        [property: JsonPropertyName("completed_at")] DateTimeOffset? CompletedAt,
+        [property: JsonPropertyName("cancelled_at")] DateTimeOffset? CancelledAt,
+        [property: JsonPropertyName("cancel_reason")] string? CancelReason);
+
+    private sealed record PostgrestError(
+        [property: JsonPropertyName("code")] string? Code,
+        [property: JsonPropertyName("message")] string? Message);
+
+    private sealed record PlaceOrderRpcBody(
+        [property: JsonPropertyName("p_student")] Guid Student,
+        [property: JsonPropertyName("p_vendor")] string Vendor,
+        [property: JsonPropertyName("p_subtotal")] decimal Subtotal,
+        [property: JsonPropertyName("p_total")] decimal Total,
+        [property: JsonPropertyName("p_pickup")] string Pickup,
+        [property: JsonPropertyName("p_note")] string? Note,
+        [property: JsonPropertyName("p_items")] IReadOnlyList<PlaceOrderRpcItem> Items);
+
+    private sealed record PlaceOrderRpcItem(
+        [property: JsonPropertyName("menu_item_id")] string MenuItemId,
+        [property: JsonPropertyName("vendor_id")] string VendorId,
+        [property: JsonPropertyName("name")] string Name,
+        [property: JsonPropertyName("unit_price")] decimal UnitPrice,
+        [property: JsonPropertyName("qty")] int Qty);
+
+    private sealed record TransitionRpcBody(
+        [property: JsonPropertyName("p_id")] Guid Id,
+        [property: JsonPropertyName("p_to")] string To,
+        [property: JsonPropertyName("p_reason")] string? Reason);
 }

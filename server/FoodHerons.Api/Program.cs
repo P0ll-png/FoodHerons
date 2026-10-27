@@ -4,22 +4,23 @@ using FoodHerons.Api.Endpoints;
 using FoodHerons.Api.Services;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
-using Npgsql;
 
 var builder = WebApplication.CreateBuilder(args);
 
 const string CorsPolicy = "frontend";
 
-// Fail fast on a missing/empty service-role connection string instead of letting
-// every POST /api/orders crash on its first DB call. The test host runs with no
-// live DB, so skip the throw under the "Testing" environment.
-var postgres = builder.Configuration.GetConnectionString("Postgres");
-if (string.IsNullOrWhiteSpace(postgres) && !builder.Environment.IsEnvironment("Testing"))
+// Fail fast on missing Supabase REST configuration instead of letting every
+// POST /api/orders crash on its first HTTPS call. The test host runs with no
+// live config, so skip the throw under the "Testing" environment.
+var supabaseUrl = builder.Configuration["Supabase:Url"];
+var serviceRoleKey = builder.Configuration["Supabase:ServiceRoleKey"];
+if ((string.IsNullOrWhiteSpace(supabaseUrl) || string.IsNullOrWhiteSpace(serviceRoleKey))
+    && !builder.Environment.IsEnvironment("Testing"))
 {
     throw new InvalidOperationException(
-        "Missing Postgres connection string. Set 'ConnectionStrings:Postgres' " +
-        "(env 'ConnectionStrings__Postgres') via dotnet user-secrets or environment " +
-        "variables before starting the API.");
+        "Missing Supabase REST configuration. Set 'Supabase:Url' and " +
+        "'Supabase:ServiceRoleKey' (env 'Supabase__ServiceRoleKey') via dotnet " +
+        "user-secrets or environment variables before starting the API.");
 }
 
 // ---- Services --------------------------------------------------------------
@@ -35,14 +36,26 @@ builder.Services.AddCors(options =>
 builder.Services.AddProblemDetails();
 builder.Services.AddSingleton<OrderService>();
 
-// Npgsql data source from the service-role connection string. Registered even
-// when empty so the app builds/runs with no live DB (connections open lazily).
-builder.Services.AddSingleton(sp =>
+// Typed HttpClient for the Supabase-backed data layer. BaseAddress is set only
+// when Supabase:Url is non-empty (composing the PostgREST /rest/v1/ root) and
+// the apikey/Authorization headers are added only when the service-role key is
+// non-empty, so absent/empty config never throws at registration; an unconfigured
+// client throws at send time, which the endpoint try/catch turns into a clean 500.
+builder.Services.AddHttpClient<Db>(client =>
 {
-    var connectionString = builder.Configuration.GetConnectionString("Postgres");
-    return new NpgsqlDataSourceBuilder(connectionString ?? string.Empty).Build();
+    var baseUrl = builder.Configuration["Supabase:Url"];
+    var key = builder.Configuration["Supabase:ServiceRoleKey"];
+
+    if (!string.IsNullOrWhiteSpace(baseUrl))
+        client.BaseAddress = new Uri($"{baseUrl.TrimEnd('/')}/rest/v1/");
+
+    if (!string.IsNullOrWhiteSpace(key))
+    {
+        client.DefaultRequestHeaders.Add("apikey", key);
+        client.DefaultRequestHeaders.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", key);
+    }
 });
-builder.Services.AddSingleton<Db>();
 
 var app = builder.Build();
 

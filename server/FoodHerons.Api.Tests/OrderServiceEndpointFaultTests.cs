@@ -1,8 +1,10 @@
 using System.Net;
+using System.Net.Http;
 using System.Net.Http.Json;
 using System.Security.Claims;
 using System.Text.Encodings.Web;
 using System.Text.Json;
+using FoodHerons.Api.Data;
 using FoodHerons.Api.Dtos;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Hosting;
@@ -16,11 +18,14 @@ using Xunit;
 namespace FoodHerons.Api.Tests;
 
 /// <summary>
-/// Exercises the exact POST /api/orders path that was returning a raw HTTP 500:
-/// a validation-passing request reaches the first DB call (GetVendorAsync) with an
-/// empty connection string and throws. Asserts the global exception handler + read
-/// try/catch now produce a clean 500 ProblemDetails (code INTERNAL + correlationId),
-/// not a leaked stack trace.
+/// Exercises the exact POST /api/orders path that was returning a raw HTTP 500.
+/// The data layer talks to Supabase over HTTPS (typed HttpClient against
+/// ${Supabase:Url}/rest/v1/, PostgREST GET reads + place_order/transition_order RPC
+/// writes). This test injects a fault at that transport by overriding the typed Db
+/// client's primary handler with a <see cref="ThrowingHandler"/>, so the first data
+/// call (GetVendorAsync) throws with zero network. Asserts the global exception
+/// handler + read try/catch produce a clean 500 ProblemDetails (code INTERNAL +
+/// correlationId), not a leaked stack trace.
 /// </summary>
 public class OrderServiceEndpointFaultTests : IClassFixture<FaultWebAppFactory>
 {
@@ -61,9 +66,12 @@ public class OrderServiceEndpointFaultTests : IClassFixture<FaultWebAppFactory>
 }
 
 /// <summary>
-/// In-memory host with the "Testing" environment (empty connection string allowed)
-/// and a stub auth scheme that yields a <c>student</c> principal, so the request
-/// passes RequireAuthorization + the student-role check and reaches the DB fault.
+/// In-memory host with the "Testing" environment (the Supabase fail-fast is skipped
+/// there) and a stub auth scheme that yields a <c>student</c> principal, so the
+/// request passes RequireAuthorization + the student-role check and reaches the data
+/// layer. The typed <see cref="Db"/> client's primary handler is replaced with a
+/// <see cref="ThrowingHandler"/> so the Supabase HTTPS call fails deterministically
+/// with zero network — the endpoint try/catch then yields the clean 500.
 /// </summary>
 public sealed class FaultWebAppFactory : WebApplicationFactory<Program>
 {
@@ -81,8 +89,21 @@ public sealed class FaultWebAppFactory : WebApplicationFactory<Program>
                 options.DefaultAuthenticateScheme = TestAuthHandler.SchemeName;
                 options.DefaultChallengeScheme = TestAuthHandler.SchemeName;
             });
+
+            // Make the fault path deterministic and network-free by overriding the
+            // TYPED Db client's primary handler (not a named client — that would build
+            // a different, unused client). The first data call throws, with no DNS/connect.
+            services.AddHttpClient<Db>()
+                .ConfigurePrimaryHttpMessageHandler(() => new ThrowingHandler());
         });
     }
+}
+
+/// <summary>An HttpMessageHandler that always throws, injecting a transport fault with zero network.</summary>
+public sealed class ThrowingHandler : HttpMessageHandler
+{
+    protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
+        throw new HttpRequestException("fault-test");
 }
 
 /// <summary>A no-network auth handler that always authenticates as a fixed student user.</summary>
