@@ -325,6 +325,9 @@
 .dashboard-switch--lg .dashboard-switch__thumb { top: 4px; left: 4px; width: 24px; height: 24px; }
 .dashboard-switch--lg input:checked + .dashboard-switch__track .dashboard-switch__thumb { transform: translateX(24px); }
 
+.dashboard-switch--disabled { opacity: 0.5; cursor: not-allowed; }
+.dashboard-switch--disabled input { cursor: not-allowed; }
+
 
 /* ---------- Main container + heading ---------- */
 
@@ -779,6 +782,8 @@
 .dashboard-empty__icon { color: var(--orange-dark); }
 .dashboard-empty .dashboard-btn { margin-top: 8px; }
 .dashboard-empty--small { padding: 32px 20px; background: transparent; }
+/* Approval banner shown above the active page while a store is not approved. */
+.dashboard-empty--banner { padding: 28px 24px; margin-bottom: 20px; }
 
 
 /* ---------- Menu items ---------- */

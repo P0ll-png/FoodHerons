@@ -25,7 +25,7 @@ export default function Search() {
   const inputRef = useRef(null)
   const navigate = useNavigate()
   const location = useLocation()
-  const { vendors, categoryName } = useVendors() // live data, so dashboard edits show up in search
+  const { publicVendors, categoryName } = useVendors() // approved stores only, so dashboard edits show up in search
   const [query, setQuery] = useState('')
   const [recent, setRecent] = useState(loadRecent)
 
@@ -55,7 +55,7 @@ export default function Search() {
   const q = query.trim().toLowerCase()
   const results = useMemo(() => {
     if (!q) return []
-    return vendors.filter((v) => {
+    return publicVendors.filter((v) => {
       const hay = [
         v.name,
         v.description,
@@ -67,14 +67,14 @@ export default function Search() {
         .toLowerCase()
       return hay.includes(q)
     })
-  }, [q, vendors])
+  }, [q, publicVendors])
 
   const popular = useMemo(
     () =>
-      [...vendors]
+      [...publicVendors]
         .sort((a, b) => b.reviews - a.reviews || b.rating - a.rating)
         .slice(0, POPULAR_COUNT),
-    [vendors]
+    [publicVendors]
   )
 
   return (

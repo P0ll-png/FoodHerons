@@ -337,6 +337,24 @@
 .admin-status--completed { background: var(--done-bg, #ededed); color: var(--done-fg, #555); }
 .admin-status--cancelled { background: #f0e9e5; color: #78716c; }
 
+/* ---------- Approval filter + status badge ---------- */
+.admin-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.admin-filter__count {
+  font-weight: 700;
+  opacity: 0.75;
+}
+
+/* Capitalize the approval label on the reused .badge tints (open/preorder/closed). */
+.admin-approval {
+  text-transform: capitalize;
+}
+
 /* ---------- Responsive ---------- */
 @media (max-width: 760px) {
   .admin-edit__grid {

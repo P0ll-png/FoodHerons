@@ -145,10 +145,10 @@ function dayLabel(daysAgo) {
 /* ------------------------------------------------------------------ */
 /*  Small shared pieces                                                */
 /* ------------------------------------------------------------------ */
-function Switch({ checked, onChange, label, large = false }) {
+function Switch({ checked, onChange, label, large = false, disabled = false }) {
   return (
-    <label className={`dashboard-switch ${large ? 'dashboard-switch--lg' : ''}`}>
-      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} aria-label={label} />
+    <label className={`dashboard-switch ${large ? 'dashboard-switch--lg' : ''} ${disabled ? 'dashboard-switch--disabled' : ''}`}>
+      <input type="checkbox" checked={checked} disabled={disabled} onChange={(e) => onChange(e.target.checked)} aria-label={label} />
       <span className="dashboard-switch__track" aria-hidden="true"><span className="dashboard-switch__thumb" /></span>
     </label>
   )
@@ -785,7 +785,7 @@ function ProfileTab({ saved, onSave, preorder, flash, vendor, categories }) {
   const [logoMenu, setLogoMenu] = useState(false)
   const [coverMenu, setCoverMenu] = useState(false)
 
-  const FORM_KEYS = ['name', 'description', 'category', 'phone', 'locationArea', 'hoursOpen', 'hoursClose']
+  const FORM_KEYS = ['name', 'description', 'category', 'phone', 'gcashNumber', 'gcashName', 'locationArea', 'hoursOpen', 'hoursClose']
   const formOf = (o) => Object.fromEntries(FORM_KEYS.map((k) => [k, o[k]]))
   const dirty = JSON.stringify(formOf(draft)) !== JSON.stringify(formOf(saved))
   const set = (k) => (e) => setDraft((d) => ({ ...d, [k]: e.target.value }))
@@ -878,6 +878,19 @@ function ProfileTab({ saved, onSave, preorder, flash, vendor, categories }) {
                     aria-label="Contact number, after +63" aria-invalid={phoneBad || undefined} aria-describedby={phoneBad ? 'p-phone-err' : undefined} />
                 </div>
                 {phoneBad && <p id="p-phone-err" className="dashboard-error dashboard-error--sm" role="alert">Enter a 10-digit mobile number starting with 9.</p>}
+              </div>
+            </div>
+            <div className="dashboard-grid2">
+              <div className="dashboard-field">
+                <label htmlFor="p-gcash-number">GCash number</label>
+                <input id="p-gcash-number" type="tel" inputMode="numeric" className="dashboard-input"
+                  value={draft.gcashNumber} onChange={set('gcashNumber')} placeholder="e.g. 0917 123 4567" />
+                <p className="dashboard-hint">Students send pre-order payments to this GCash number. Required to turn on pre-ordering.</p>
+              </div>
+              <div className="dashboard-field">
+                <label htmlFor="p-gcash-name">GCash account name</label>
+                <input id="p-gcash-name" className="dashboard-input"
+                  value={draft.gcashName} onChange={set('gcashName')} placeholder="e.g. Elena Reyes" />
               </div>
             </div>
           </section>
@@ -1308,7 +1321,7 @@ const NAV = [
   { id: 'menu', label: 'Menu', icon: 'utensils' },
 ]
 
-function TopBar({ tab, onTab, preorder, onPreorder, pendingCount, profile, onExit, onLogout }) {
+function TopBar({ tab, onTab, preorder, onPreorder, preorderLock, pendingCount, profile, onExit, onLogout }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const accountRef = useRef(null)
 
@@ -1397,13 +1410,24 @@ function TopBar({ tab, onTab, preorder, onPreorder, pendingCount, profile, onExi
                 Account settings
               </button>
 
-              {/* Pre-ordering switch */}
+              {/* Pre-ordering switch (disabled while not approved or no GCash number) */}
               <div className="dashboard-account__preorder">
                 <span className="dashboard-account__preorder-text">
                   <strong>Pre-ordering</strong>
-                  <small>{preorder ? 'Students can order ahead.' : 'Listing-only. Students can’t order.'}</small>
+                  <small>
+                    {preorderLock?.disabled
+                      ? preorderLock.hint
+                      : preorder
+                      ? 'Students can order ahead.'
+                      : 'Listing-only. Students can’t order.'}
+                  </small>
                 </span>
-                <Switch checked={preorder} onChange={onPreorder} label="Pre-ordering" />
+                <Switch
+                  checked={preorder}
+                  onChange={onPreorder}
+                  label="Pre-ordering"
+                  disabled={preorderLock?.disabled}
+                />
               </div>
 
               {/* Exit / log out */}
@@ -1451,7 +1475,27 @@ export default function Dashboard() {
   const vendor = getVendor(currentVendorId)
   const vid = vendor?.id
   const preorder = Boolean(vendor?.preorderEnabled)
-  const setPreorder = (on) => setPreorderEnabled(vid, on) // pre-order switch
+  const approvalStatus = vendor?.approvalStatus ?? 'pending'
+  const isApproved = approvalStatus === 'approved'
+  const hasGcash = Boolean(vendor?.gcashNumber)
+  // The pre-order Switch is gated two ways (FR1.6 + GCash gate): a store that
+  // is not approved, or has no GCash number, cannot turn pre-ordering on.
+  const preorderLock = !isApproved
+    ? {
+        disabled: true,
+        hint:
+          approvalStatus === 'suspended'
+            ? 'Your store is suspended. Pre-ordering is unavailable.'
+            : 'Your store is awaiting admin approval.',
+      }
+    : !hasGcash
+    ? { disabled: true, hint: 'Add your GCash number in Store info to enable pre-ordering' }
+    : { disabled: false, hint: '' }
+  // Guard the setter so a forced-on toggle can never fire while locked.
+  const setPreorder = (on) => {
+    if (preorderLock.disabled) return
+    setPreorderEnabled(vid, on)
+  }
   const menu = vendor?.menu ?? []
 
   // Fetch this store's orders (read-only; RLS lets the owner read their vendor's orders).
@@ -1498,6 +1542,8 @@ export default function Dashboard() {
     cover: vendor?.cover ?? '',
     logo: vendor?.logo ?? '',
     phone: vendor?.phone ?? '',
+    gcashNumber: vendor?.gcashNumber ?? '',
+    gcashName: vendor?.gcashName ?? '',
   }), [vendor])
 
   // Small "toast" message at the bottom of the screen.
@@ -1579,6 +1625,7 @@ export default function Dashboard() {
         onTab={setTab}
         preorder={preorder}
         onPreorder={setPreorder}
+        preorderLock={preorderLock}
         pendingCount={pendingCount}
         profile={profile}
         onExit={() => navigate('/')}
@@ -1587,6 +1634,19 @@ export default function Dashboard() {
 
       {/* Active page */}
       <section className="dashboard-main">
+        {!isApproved && (
+          <div className="dashboard-empty dashboard-empty--banner" role="status">
+            <span className="dashboard-empty__icon"><Icon name="lock" size={34} /></span>
+            <h2>{approvalStatus === 'suspended' ? 'Your store is suspended' : 'Your store is awaiting approval'}</h2>
+            <p>
+              {approvalStatus === 'suspended'
+                ? 'An admin has suspended your store, so it is hidden from students and pre-ordering is turned off. You can still edit your store and menu while it is suspended.'
+                : approvalStatus === 'rejected'
+                ? 'Your store was not approved. Update your store details — an admin can re-activate it. It stays hidden from students and pre-ordering is unavailable for now.'
+                : 'An admin needs to approve your store before students can see it or pre-order. You can set up your store and menu in the meantime.'}
+            </p>
+          </div>
+        )}
         {tab === 'dashboard' && (preorder
           ? <DashboardTab history={allHistory} />
           : <HistoryUnavailable onTurnOn={() => setPreorder(true)} />)}

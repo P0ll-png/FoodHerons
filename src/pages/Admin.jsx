@@ -167,31 +167,74 @@ export default function Admin() {
 /* =========================================================================
    (a) Manage vendors
    ========================================================================= */
+const APPROVAL_FILTERS = [
+  { key: 'all', label: 'All' },
+  { key: 'pending', label: 'Pending' },
+  { key: 'approved', label: 'Approved' },
+  { key: 'rejected', label: 'Rejected' },
+  { key: 'suspended', label: 'Suspended' },
+]
+
 function VendorsPanel({ vendors, profiles, categories, locationAreas, categoryName, onChanged, setError }) {
   const [editingId, setEditingId] = useState(null)
+  const [statusFilter, setStatusFilter] = useState('all')
+
+  const shown = useMemo(
+    () =>
+      statusFilter === 'all'
+        ? vendors
+        : vendors.filter((v) => (v.approval_status || 'pending') === statusFilter),
+    [vendors, statusFilter],
+  )
 
   if (!vendors.length) {
     return <p className="admin-state">No vendors yet.</p>
   }
 
   return (
-    <ul className="admin-list">
-      {vendors.map((v) => (
-        <VendorRow
-          key={v.id}
-          vendor={v}
-          profiles={profiles}
-          categories={categories}
-          locationAreas={locationAreas}
-          categoryName={categoryName}
-          editing={editingId === v.id}
-          onEdit={() => setEditingId((cur) => (cur === v.id ? null : v.id))}
-          onDone={() => setEditingId(null)}
-          onChanged={onChanged}
-          setError={setError}
-        />
-      ))}
-    </ul>
+    <>
+      <div className="admin-filter" role="group" aria-label="Filter vendors by approval status">
+        {APPROVAL_FILTERS.map((f) => {
+          const count =
+            f.key === 'all'
+              ? vendors.length
+              : vendors.filter((v) => (v.approval_status || 'pending') === f.key).length
+          return (
+            <button
+              key={f.key}
+              type="button"
+              className={`chip${statusFilter === f.key ? ' chip--active' : ''}`}
+              onClick={() => setStatusFilter(f.key)}
+              aria-pressed={statusFilter === f.key}
+            >
+              {f.label} <span className="admin-filter__count">{count}</span>
+            </button>
+          )
+        })}
+      </div>
+
+      {shown.length ? (
+        <ul className="admin-list">
+          {shown.map((v) => (
+            <VendorRow
+              key={v.id}
+              vendor={v}
+              profiles={profiles}
+              categories={categories}
+              locationAreas={locationAreas}
+              categoryName={categoryName}
+              editing={editingId === v.id}
+              onEdit={() => setEditingId((cur) => (cur === v.id ? null : v.id))}
+              onDone={() => setEditingId(null)}
+              onChanged={onChanged}
+              setError={setError}
+            />
+          ))}
+        </ul>
+      ) : (
+        <p className="admin-state">No vendors with this status.</p>
+      )}
+    </>
   )
 }
 
@@ -244,6 +287,14 @@ function VendorRow({
 
   const owner = profiles.find((p) => p.id === vendor.owner_id)
   const open = isOpenNow(vendor.hours_open, vendor.hours_close)
+  const status = vendor.approval_status || 'pending'
+  // Reuse existing badge tints; no new colors.
+  const statusBadge =
+    status === 'approved'
+      ? 'badge--open'
+      : status === 'pending'
+      ? 'badge--preorder'
+      : 'badge--closed'
 
   const run = async (fn) => {
     setBusy(true)
@@ -272,6 +323,11 @@ function VendorRow({
     run(() =>
       supabase.from('vendors').update({ preorder_enabled: !vendor.preorder_enabled }).eq('id', vendor.id),
     )
+
+  // Approval transitions — admin-only, enforced server-side by
+  // guard_vendor_columns + the vendors admin UPDATE RLS branch.
+  const setApproval = (next) =>
+    run(() => supabase.from('vendors').update({ approval_status: next }).eq('id', vendor.id))
 
   const saveStore = async (e) => {
     e.preventDefault()
@@ -305,6 +361,7 @@ function VendorRow({
             {open ? 'Open now' : 'Closed'}
           </span>
           {vendor.preorder_enabled && <span className="badge badge--preorder">Pre-order</span>}
+          <span className={`badge ${statusBadge} admin-approval admin-approval--${status}`}>{status}</span>
           <span className="chip chip--active">{categoryName(vendor.category)}</span>
         </div>
         <p className="admin-vrow__owner">
@@ -352,6 +409,49 @@ function VendorRow({
         >
           {vendor.preorder_enabled ? 'Disable pre-order' : 'Enable pre-order'}
         </button>
+
+        {status === 'pending' && (
+          <>
+            <button
+              type="button"
+              className="btn btn--primary admin-btn-sm"
+              onClick={() => setApproval('approved')}
+              disabled={busy}
+            >
+              Approve
+            </button>
+            <button
+              type="button"
+              className="btn btn--ghost admin-btn-sm admin-danger"
+              onClick={() => setApproval('rejected')}
+              disabled={busy}
+            >
+              Reject
+            </button>
+          </>
+        )}
+
+        {status === 'approved' && (
+          <button
+            type="button"
+            className="btn btn--ghost admin-btn-sm admin-danger"
+            onClick={() => setApproval('suspended')}
+            disabled={busy}
+          >
+            Suspend
+          </button>
+        )}
+
+        {(status === 'rejected' || status === 'suspended') && (
+          <button
+            type="button"
+            className="btn btn--primary admin-btn-sm"
+            onClick={() => setApproval('approved')}
+            disabled={busy}
+          >
+            Re-activate
+          </button>
+        )}
 
         <button type="button" className="btn btn--ghost admin-btn-sm" onClick={onEdit} disabled={busy}>
           {editing ? 'Close' : 'Edit store'}

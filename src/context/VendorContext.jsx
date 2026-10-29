@@ -47,6 +47,9 @@ const mapVendor = (r, menu) => ({
   rating: r.rating,
   reviews: r.review_count,
   phone: r.phone,
+  gcashNumber: r.gcash_number,
+  gcashName: r.gcash_name,
+  approvalStatus: r.approval_status,
   preorderEnabled: r.preorder_enabled,
   coverTint: r.cover_tint,
   logo: r.logo_url,
@@ -134,7 +137,17 @@ export function VendorProvider({ children }) {
     [rawVendors, now]
   )
 
-  // Find one vendor by id.
+  // Student-facing list: only approved stores. Admin/owner reads return
+  // non-approved rows too, so the public surfaces (directory, search, store
+  // page) consume this filtered list instead of `vendors`.
+  const publicVendors = useMemo(
+    () => vendors.filter((v) => v.approvalStatus === 'approved'),
+    [vendors]
+  )
+
+  // Find one vendor by id. PINNED INVARIANT (§2.5): bound to the FULL `vendors`
+  // list, never `publicVendors`. The in-flight payment step resolves the
+  // vendor's GCash details via getVendor even for a store suspended mid-flow.
   const getVendor = useCallback((id) => vendors.find((v) => v.id === id), [vendors])
 
   // Category id -> display name (falls back to the id).
@@ -158,6 +171,8 @@ export function VendorProvider({ children }) {
       if (info.hoursOpen !== undefined) patch.hours_open = info.hoursOpen
       if (info.hoursClose !== undefined) patch.hours_close = info.hoursClose
       if (info.phone !== undefined) patch.phone = info.phone
+      if (info.gcashNumber !== undefined) patch.gcash_number = info.gcashNumber
+      if (info.gcashName !== undefined) patch.gcash_name = info.gcashName
       if (info.logo !== undefined) patch.logo_url = info.logo
       if (info.cover !== undefined) patch.cover_url = info.cover
 
@@ -243,6 +258,7 @@ export function VendorProvider({ children }) {
   const value = useMemo(
     () => ({
       vendors,
+      publicVendors,
       categories,
       locationAreas,
       categoryName,
@@ -257,6 +273,7 @@ export function VendorProvider({ children }) {
     }),
     [
       vendors,
+      publicVendors,
       categories,
       locationAreas,
       categoryName,

@@ -82,8 +82,12 @@ export default function VendorStore() {
     rating,
     reviews: reviewCount,
     preorderEnabled,
+    approvalStatus,
   } = vendor
-  const canOrder = preorderEnabled && isOpen
+  // A non-approved store (pending/rejected/suspended) is never orderable, even
+  // if the owner reaches their own store page (getVendor resolves the full list).
+  const isApproved = approvalStatus === 'approved'
+  const canOrder = isApproved && preorderEnabled && isOpen
 
   // Cart lines belong to this vendor only.
   const cartIsThisVendor = vendorId === vendor.id
@@ -155,10 +159,13 @@ export default function VendorStore() {
       {/* ---------- Body ---------- */}
       <div className="container store-body">
         <section className="store-menu" aria-label="Menu">
-          {!preorderEnabled && (
+          {!isApproved && (
+           <p className="store-note store-note--closed">This vendor isn't available right now.</p>
+         )}
+          {isApproved && !preorderEnabled && (
            <p className="store-note">This vendor is not accepting pre-orders. Visit the stall to buy.</p>
          )}
-          {preorderEnabled && !isOpen && (
+          {isApproved && preorderEnabled && !isOpen && (
            <p className="store-note store-note--closed">
              This store is closed right now. Pre-orders open at {hoursOpen}.
            </p>

@@ -189,13 +189,13 @@ function VendorResults({
 export default function Home() {
   /* ---------- State & data ---------- */
   const [params, setParams] = useSearchParams()
-  const { vendors, categories, locationAreas } = useVendors() // live store data (edited from the vendor dashboard)
+  const { publicVendors, categories, locationAreas } = useVendors() // approved stores only (edited from the vendor dashboard)
   const [activeCategory, setActiveCategory] = useState(null) // clicked category tile (null = none yet)
   const resultsRef = useRef(null)                         // category results section (we scroll to it)
   const catScroll = useDragScroll()                       // drag-to-scroll for the category row
 
   /* ---------- Derived data ---------- */
-  const openCount = vendors.filter((v) => v.isOpen).length
+  const openCount = publicVendors.filter((v) => v.isOpen).length
 
   // Vendors for the clicked category: their main category, or they sell an item in it
   const categoryVendors = useMemo(
@@ -203,11 +203,11 @@ export default function Home() {
       activeCategory === null
         ? []
         : activeCategory === 'all'
-        ? vendors // the "All" tile shows every vendor
-        : vendors.filter(
+        ? publicVendors // the "All" tile shows every vendor
+        : publicVendors.filter(
             (v) => v.category === activeCategory || (v.menu || []).some((m) => m.category === activeCategory)
           ),
-    [vendors, activeCategory]
+    [publicVendors, activeCategory]
   )
 
   /* ---------- Behaviour ---------- */
@@ -251,7 +251,7 @@ export default function Home() {
 
             {/* Quick stats */}
             <div className="hero__stats">
-              <span><strong>{vendors.length}</strong> vendors</span>
+              <span><strong>{publicVendors.length}</strong> vendors</span>
               <span className="dot" aria-hidden="true">·</span>
               <span><strong>{openCount}</strong> open now</span>
               <span className="dot" aria-hidden="true">·</span>
@@ -359,7 +359,7 @@ export default function Home() {
         {/* ---------- Directory: Vendors near you (with filter bar) ---------- */}
         <div className="container section" role="region" aria-labelledby="dir-heading">
           <VendorResults
-            list={vendors}
+            list={publicVendors}
             locationAreas={locationAreas}
             headingId="dir-heading"
             title="Vendors near you"
