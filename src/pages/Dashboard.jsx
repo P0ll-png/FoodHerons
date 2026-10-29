@@ -5,6 +5,7 @@ import { useVendors } from '../context/VendorContext'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
 import { transitionOrder } from '../lib/api'
+import { aggregateByDay, buildRevenuePdf } from '../lib/revenuePdf'
 import './Dashboard.css'
 
 /* ------------------------------------------------------------------ */
@@ -379,7 +380,7 @@ function RejectDialog({ order, onCancel, onConfirm }) {
 /* ------------------------------------------------------------------ */
 /*  Dashboard home: finance summary + order history                                                   */
 /* ------------------------------------------------------------------ */
-function DashboardTab({ history }) {
+function DashboardTab({ history, storeName, flash }) {
   // Filters: date range (defaults to Today), status tab and search text.
   const [range, setRange] = useState('today')
   const [status, setStatus] = useState('all')
@@ -397,6 +398,28 @@ function DashboardTab({ history }) {
   const revenue = done.reduce((n, o) => n + o.total, 0)
   const avg = done.length ? Math.round(revenue / done.length) : 0
   const rangeName = { today: 'today', 7: 'last 7 days', 30: 'last 30 days', all: 'all time' }[range]
+
+  // Export the in-range completed orders as a PDF revenue report. Groups by the
+  // real calendar day via the canonical placedAt on each row (DOM-free builder).
+  const exportPdf = () => {
+    try {
+      const { days, grandTotal, orderCount } = aggregateByDay(done)
+      const rangeLabel = RANGES.find((r) => r.id === range).label
+      const doc = buildRevenuePdf({
+        storeName,
+        rangeLabel,
+        generatedAt: new Date().toLocaleString('en-PH'),
+        days,
+        grandTotal,
+        orderCount,
+      })
+      doc.save(`revenue-${range}.pdf`)
+      flash('Revenue report downloaded')
+    } catch (err) {
+      console.error('Failed to build revenue PDF:', err)
+      flash('Could not generate the PDF. Please try again.')
+    }
+  }
 
   // Revenue of the period right before the selected one (yesterday, the 7 days before, etc.)
   // so the revenue card can show a "+x% vs ..." trend. "All time" has nothing to compare with.
@@ -431,7 +454,12 @@ function DashboardTab({ history }) {
   return (
     <>
       {/* Page heading */}
-      <PageHead title="Welcome!" sub="This is your finance and order history report." />
+      <PageHead title="Welcome!" sub="This is your finance and order history report.">
+        <button type="button" className="dashboard-btn dashboard-btn--outline" onClick={exportPdf}>
+          <Icon name="download" size={16} />
+          Export PDF
+        </button>
+      </PageHead>
 
       {/* Date range filter (Today / Last 7 days / Last 30 days / All time) */}
       <div className="dashboard-pills" role="group" aria-label="Date range">
@@ -1521,7 +1549,7 @@ export default function Dashboard() {
         status: o.status,
       }
       if (o.status === 'completed' || o.status === 'cancelled') {
-        done.push({ ...base, reason: o.cancel_reason || undefined, daysAgo: daysAgoFrom(o.placed_at) })
+        done.push({ ...base, reason: o.cancel_reason || undefined, daysAgo: daysAgoFrom(o.placed_at), placedAt: Date.parse(o.placed_at) })
       } else {
         live.push({ ...base, placedAt: Date.parse(o.placed_at) })
       }
@@ -1648,7 +1676,7 @@ export default function Dashboard() {
           </div>
         )}
         {tab === 'dashboard' && (preorder
-          ? <DashboardTab history={allHistory} />
+          ? <DashboardTab history={allHistory} storeName={vendor?.name ?? 'Store'} flash={flash} />
           : <HistoryUnavailable onTurnOn={() => setPreorder(true)} />)}
         {tab === 'orders' && (
           <OrdersTab orders={orders} menu={menu} preorder={preorder} onTurnOn={() => setPreorder(true)}
