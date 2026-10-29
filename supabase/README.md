@@ -23,6 +23,28 @@ order** (each is idempotent-where-specified, so a re-run is safe):
 6. `migrations/0006_seed.sql` — the 6 categories (+ `uncategorized`) and
    6 location areas (+ `unassigned`). The 8 vendors and their menus are **not**
    seeded here — see step 2.
+7. `migrations/0007_order_rpcs.sql` — the `place_order` and (3-arg)
+   `transition_order` RPCs backing the C# order service.
+8. `migrations/0008_vendor_approval.sql` — the `vendor_approval_status` enum +
+   `vendors.approval_status` (new signups default to `pending`; existing stores
+   are backfilled to `approved` once), the `gcash_number`/`gcash_name` columns,
+   the admin-only approval branch in `guard_vendor_columns`, and the narrowed
+   `vendors` SELECT policy (students/anon see only approved stores).
+9. `migrations/0009_order_payment_enum.sql` — the two new `order_status` labels
+   (`awaiting_payment`, `payment_submitted`). **Run this as its OWN SQL-editor
+   execution and let it finish before pasting/running `0010` — do not paste both
+   files into a single run.** The SQL editor wraps a multi-statement run in one
+   transaction, and Postgres forbids *using* a newly added enum label in the same
+   transaction that added it; `0010` both sets a column default to
+   `awaiting_payment` and references the labels inside RPC bodies, so the enum
+   add must be committed first.
+10. `migrations/0010_order_payment.sql` — the `orders` payment columns, the
+    `awaiting_payment` status default, the **private** `payment-proofs` Storage
+    bucket + its INSERT/SELECT policies, the `submit_payment` RPC, and the 4-arg
+    `transition_order` overload (the old 3-arg overload is dropped). **Requires
+    the Supabase `storage` schema (hosted project), not bare Postgres.** New
+    orders now start `awaiting_payment`, and a vendor must set a `gcash_number`
+    (Store info) before pre-ordering works against their store.
 
 ## 2. Run the demo-account seed script
 

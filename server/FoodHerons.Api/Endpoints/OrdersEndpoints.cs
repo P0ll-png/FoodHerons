@@ -18,6 +18,7 @@ public static class OrdersEndpoints
     {
         group.MapPost("/orders", PlaceOrderAsync);
         group.MapPost("/orders/{id:guid}/transition", TransitionAsync);
+        group.MapPost("/orders/{id:guid}/payment", SubmitPaymentAsync);
         return group;
     }
 
@@ -138,10 +139,20 @@ public static class OrdersEndpoints
         if (!plan.IsSuccess)
             return FromDomainError(http, plan.Error!);
 
+        var isAdmin = string.Equals(http.User.GetRole(), "admin", StringComparison.Ordinal);
+
         // Authorization depends on who is allowed to make this move.
         var authorized = plan.Value!.Kind switch
         {
-            TransitionKind.StudentCancel => state.StudentId == userId.Value || await IsVendorOwnerAsync(db, state.VendorId, userId.Value, ct),
+            // Student owner or vendor owner always; admin ONLY for the two
+            // pre-payment from-states (design §4.4) — never a plain pending cancel.
+            TransitionKind.StudentCancel =>
+                state.StudentId == userId.Value
+                || await IsVendorOwnerAsync(db, state.VendorId, userId.Value, ct)
+                || (isAdmin && plan.Value.From is OrderStatuses.AwaitingPayment or OrderStatuses.PaymentSubmitted),
+            // Verify/reject payment: vendor owner or admin.
+            TransitionKind.PaymentReview =>
+                isAdmin || await IsVendorOwnerAsync(db, state.VendorId, userId.Value, ct),
             TransitionKind.VendorAction => await IsVendorOwnerAsync(db, state.VendorId, userId.Value, ct),
             _ => false
         };
@@ -155,7 +166,7 @@ public static class OrdersEndpoints
         Result<OrderRow> applied;
         try
         {
-            applied = await db.ApplyTransitionAsync(orderService, id, to, request.Reason?.Trim(), ct);
+            applied = await db.ApplyTransitionAsync(orderService, id, to, request.Reason?.Trim(), userId.Value, ct);
         }
         catch (Exception ex)
         {
@@ -174,6 +185,82 @@ public static class OrdersEndpoints
     }
 
     // ===================================================================
+    // POST /api/orders/{id}/payment
+    // ===================================================================
+    private static async Task<IResult> SubmitPaymentAsync(
+        Guid id,
+        SubmitPaymentRequest request,
+        HttpContext http,
+        OrderService orderService,
+        Db db,
+        ILoggerFactory loggerFactory,
+        CancellationToken ct)
+    {
+        var log = loggerFactory.CreateLogger("Orders.Payment");
+
+        var userId = http.User.GetUserId();
+        if (userId is null)
+            return Problem(http, StatusCodes.Status401Unauthorized, "UNAUTHENTICATED", "Authentication required.");
+
+        if (!string.Equals(http.User.GetRole(), "student", StringComparison.Ordinal))
+        {
+            log.LogWarning("Submit-payment rejected: caller {UserId} is not a student.", userId);
+            return Problem(http, StatusCodes.Status403Forbidden, "FORBIDDEN", "Only students can submit payment.");
+        }
+
+        // Reference-string rules (pure service).
+        var bodyError = orderService.ValidateSubmitPayment(request);
+        if (bodyError is not null)
+            return FromDomainError(http, bodyError);
+
+        // Authoritative screenshot-path check (design §4.4): when provided, the
+        // path's first '/'-segment must equal this route's order id with a
+        // non-empty remainder, so a student can't attach a proof under another
+        // order's prefix.
+        var screenshotPath = request.ScreenshotPath;
+        if (screenshotPath is not null)
+        {
+            var slash = screenshotPath.IndexOf('/');
+            var firstSegment = slash >= 0 ? screenshotPath[..slash] : screenshotPath;
+            var rest = slash >= 0 ? screenshotPath[(slash + 1)..] : string.Empty;
+            if (!string.Equals(firstSegment, id.ToString(), StringComparison.OrdinalIgnoreCase) || rest.Length == 0)
+                return FromDomainError(http, new DomainError(422, ErrorCodes.Validation,
+                    "screenshotPath must start with this order's id.",
+                    new Dictionary<string, object?> { ["field"] = "screenshotPath" }));
+        }
+
+        var state = await db.GetOrderStateAsync(id, ct);
+        if (state is null)
+            return Problem(http, StatusCodes.Status404NotFound, "NOT_FOUND", "Order not found.");
+
+        if (state.StudentId != userId.Value)
+        {
+            log.LogWarning("Submit-payment rejected: caller {UserId} is not the owner of order {OrderId}.", userId, id);
+            return Problem(http, StatusCodes.Status403Forbidden, "FORBIDDEN", "You are not allowed to pay for this order.");
+        }
+
+        Result<OrderRow> applied;
+        try
+        {
+            applied = await db.SubmitPaymentAsync(id, request.GcashReference!.Trim(), screenshotPath, ct);
+        }
+        catch (Exception ex)
+        {
+            var correlationId = http.TraceIdentifier;
+            log.LogError(ex, "Submit-payment DB failure. correlationId={CorrelationId} order={OrderId}", correlationId, id);
+            return ServerError(http, correlationId);
+        }
+
+        if (!applied.IsSuccess)
+            return FromDomainError(http, applied.Error!);
+
+        var row = applied.Value!;
+        log.LogInformation("Payment submitted for order {Code} by {UserId}.", row.Code, userId);
+
+        return Results.Ok(ToOrderDto(row));
+    }
+
+    // ===================================================================
     // Helpers
     // ===================================================================
 
@@ -185,7 +272,8 @@ public static class OrdersEndpoints
 
     private static OrderDto ToOrderDto(OrderRow r) => new(
         r.Id, r.Code, r.Status, r.VendorId, r.Subtotal, r.Total,
-        r.PlacedAt, r.AcceptedAt, r.ReadyAt, r.CompletedAt, r.CancelledAt, r.CancelReason);
+        r.PlacedAt, r.AcceptedAt, r.ReadyAt, r.CompletedAt, r.CancelledAt, r.CancelReason,
+        r.GcashReference, r.PaymentSubmittedAt, r.PaymentVerifiedAt, r.PaymentRejectedReason, r.PaymentScreenshotPath);
 
     private static IResult FromDomainError(HttpContext http, DomainError error)
     {

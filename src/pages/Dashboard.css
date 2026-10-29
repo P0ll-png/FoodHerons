@@ -525,6 +525,28 @@
 .dashboard-badge--completed { background: var(--ready-bg); color: var(--ready-fg); }
 .dashboard-badge--open { background: var(--yellow); color: var(--ink); }
 .dashboard-badge--cancelled { background: #f0e9e5; border: none; color: #78716c; }
+/* GCash pre-order states (orange/yellow, no blue) */
+.dashboard-badge--awaiting_payment { background: var(--yellow); color: var(--ink); }
+.dashboard-badge--payment_submitted { background: var(--orange-soft); color: var(--orange-dark); }
+
+/* Payments tab group headings + rows */
+.dashboard-payments__group {
+  font-size: var(--fs-sm);
+  font-weight: 800;
+  margin: var(--space-3) 0 var(--space-2);
+}
+.dashboard-payments__group--muted { color: var(--text-muted); }
+.dashboard-payments__ref {
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+.dashboard-payments__ref strong {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.dashboard-order--payment { border-left: 3px solid var(--orange); }
+.dashboard-order--muted { opacity: 0.85; }
 
 
 /* ---------- Dashboard home ---------- */

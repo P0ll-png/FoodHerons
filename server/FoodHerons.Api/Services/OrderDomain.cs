@@ -12,6 +12,8 @@ public static class ErrorCodes
 /// <summary>Canonical order_status values (mirrors the Postgres enum, design §4).</summary>
 public static class OrderStatuses
 {
+    public const string AwaitingPayment = "awaiting_payment";
+    public const string PaymentSubmitted = "payment_submitted";
     public const string Pending = "pending";
     public const string Preparing = "preparing";
     public const string Ready = "ready";
@@ -20,7 +22,7 @@ public static class OrderStatuses
 
     public static readonly IReadOnlySet<string> All = new HashSet<string>(StringComparer.Ordinal)
     {
-        Pending, Preparing, Ready, Completed, Cancelled
+        AwaitingPayment, PaymentSubmitted, Pending, Preparing, Ready, Completed, Cancelled
     };
 
     public static bool IsValid(string? value) => value is not null && All.Contains(value);
@@ -55,7 +57,14 @@ public enum TransitionKind
     VendorAction,
 
     /// <summary>A student cancelling their own order (legal only while pending).</summary>
-    StudentCancel
+    StudentCancel,
+
+    /// <summary>
+    /// Payment verification/rejection of a payment_submitted order
+    /// (payment_submitted -&gt; pending / awaiting_payment). Authorized for the
+    /// vendor owner OR an admin.
+    /// </summary>
+    PaymentReview
 }
 
 /// <summary>Outcome of validating a transition against the state machine.</summary>

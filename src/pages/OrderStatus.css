@@ -54,6 +54,11 @@
   background: #0d3f22;
   box-shadow: 0 0 0 8px #d1ebdb;
 }
+/* Payment: orange with a soft orange ring (no blue) */
+.state-icon--payment {
+  background: var(--orange-dark);
+  box-shadow: 0 0 0 8px var(--orange-soft);
+}
 
 /* =====================================================
    SHARED CARD
@@ -129,6 +134,12 @@
   color: #1f7a3d;
   background: #e3f6ea;
   border-color: #b7e3c6;
+}
+/* Payment (awaiting / submitted): orange-forward, no blue */
+.status-pill--payment {
+  color: var(--orange-dark);
+  background: var(--orange-soft);
+  border-color: var(--orange);
 }
 
 /* =====================================================
@@ -366,6 +377,77 @@
 }
 .order-another:hover {
   text-decoration: underline;
+}
+
+/* =====================================================
+   GCASH PAYMENT STEP
+   ===================================================== */
+.order-pay {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.order-pay__gcash {
+  text-align: center;
+  padding: var(--space-4);
+  border-radius: 16px;
+  background: var(--orange-soft);
+  border: 1px solid var(--orange);
+}
+.order-pay__gcash-label {
+  font-size: var(--fs-in);
+  color: var(--orange-dark);
+  font-weight: 600;
+}
+.order-pay__gcash-amount {
+  font-size: var(--fs-lg);
+  font-weight: 800;
+  color: var(--ink);
+  margin: 2px 0;
+}
+.order-pay__gcash-to {
+  font-size: var(--fs-sm);
+  color: var(--text);
+}
+.order-pay__gcash-to strong {
+  font-variant-numeric: tabular-nums;
+}
+.order-pay__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.order-pay__rejected,
+.order-pay__notice,
+.order-pay__waiting {
+  font-size: var(--fs-sm);
+  border-radius: 12px;
+  padding: var(--space-3);
+}
+.order-pay__rejected {
+  color: var(--danger);
+  background: #fbeae6;
+  border: 1px solid #f3c7bd;
+}
+.order-pay__notice {
+  color: var(--orange-dark);
+  background: var(--orange-soft);
+  border: 1px solid var(--orange);
+}
+.order-pay__waiting {
+  color: var(--text);
+  background: var(--yellow);
+}
+.order-pay__unavailable {
+  font-size: var(--fs-sm);
+  color: var(--danger);
+  background: #fbeae6;
+  border: 1px solid #f3c7bd;
+  border-radius: 12px;
+  padding: var(--space-3);
+}
+.order-pay__waiting strong {
+  font-variant-numeric: tabular-nums;
 }
 
 /* =====================================================

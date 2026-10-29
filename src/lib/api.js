@@ -77,3 +77,15 @@ export function postOrder(body) {
 export function transitionOrder(id, body) {
   return request(`/orders/${id}/transition`, { method: 'POST', body })
 }
+
+// POST /api/orders/{id}/payment — submit a GCash payment proof for a pre-order.
+// `id` is the order UUID. Body: { gcashReference, screenshotPath? } (reference
+// required; screenshotPath optional and, when present, must start with the order
+// id). Moves the order awaiting_payment -> payment_submitted. Returns the
+// updated OrderDto.
+export function submitPayment(id, { gcashReference, screenshotPath } = {}) {
+  return request(`/orders/${id}/payment`, {
+    method: 'POST',
+    body: { gcashReference, screenshotPath: screenshotPath ?? null },
+  })
+}

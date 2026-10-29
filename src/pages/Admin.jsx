@@ -3,6 +3,7 @@ import Icon from '../components/Icon'
 import { useAuth } from '../context/AuthContext'
 import { useVendors } from '../context/VendorContext'
 import { supabase } from '../lib/supabase'
+import { transitionOrder } from '../lib/api'
 import './Admin.css'
 
 /* ---------------------------------------------------------------------------
@@ -69,7 +70,7 @@ export default function Admin() {
         .order('created_at', { ascending: false }),
       supabase
         .from('orders')
-        .select('code, vendor_id, status, pickup_name, subtotal, total, placed_at')
+        .select('id, code, vendor_id, status, pickup_name, subtotal, total, placed_at, gcash_reference, payment_screenshot_path')
         .order('placed_at', { ascending: false }),
     ])
     const firstErr = vRes.error || pRes.error || rRes.error || oRes.error
@@ -159,7 +160,9 @@ export default function Admin() {
         />
       )}
 
-      {tab === 'orders' && <OrdersPanel orders={orders} vendorName={vendorName} />}
+      {tab === 'orders' && (
+        <OrdersPanel orders={orders} vendorName={vendorName} onChanged={loadAll} setError={setError} />
+      )}
     </div>
   )
 }
@@ -585,55 +588,135 @@ function ReviewsPanel({ reviews, vendorName, onChanged, setError }) {
 }
 
 /* =========================================================================
-   (c) All orders — READ ONLY (Phase C owns every order write)
+   (c) All orders — read-only EXCEPT GCash payment verification.
+   Payment actions (payment_submitted / awaiting_payment) go through the C#
+   order service (transitionOrder), unlike every other admin write here which
+   goes through supabase.from(...) directly. The admin is authorized server-side
+   via the PaymentReview / StudentCancel branches; the UI button is not the
+   security boundary.
    ========================================================================= */
-function OrdersPanel({ orders, vendorName }) {
+function OrdersPanel({ orders, vendorName, onChanged, setError }) {
   const rows = useMemo(() => orders, [orders])
+  // Per-row busy guard so a row's buttons disable while its write is in flight.
+  const [busyId, setBusyId] = useState(null)
 
   if (!rows.length) {
     return <p className="admin-state">No orders yet.</p>
   }
 
+  const run = async (uuid, fn) => {
+    setBusyId(uuid)
+    setError('')
+    try {
+      await fn()
+      await onChanged()
+    } catch (err) {
+      console.error('Admin order transition failed:', err)
+      setError(
+        err?.code === 'ILLEGAL_TRANSITION'
+          ? 'That order has already moved on — refresh to see its current status.'
+          : err?.message || 'Could not update the order.',
+      )
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  const verify = (uuid) => run(uuid, () => transitionOrder(uuid, { to: 'pending' }))
+
+  const reject = (uuid) => {
+    const reason = window.prompt('Why are you rejecting this payment?')
+    if (reason === null) return
+    const trimmed = reason.trim()
+    if (!trimmed) { setError('Please give a short reason for rejecting.'); return }
+    return run(uuid, () => transitionOrder(uuid, { to: 'awaiting_payment', reason: trimmed }))
+  }
+
+  const cancel = (uuid) => {
+    const reason = window.prompt('Why are you cancelling this order?')
+    if (reason === null) return
+    const trimmed = reason.trim()
+    if (!trimmed) { setError('Please give a short reason for cancelling.'); return }
+    return run(uuid, () => transitionOrder(uuid, { to: 'cancelled', reason: trimmed }))
+  }
+
+  const viewScreenshot = async (path) => {
+    if (!path) { setError('No screenshot provided for this order.'); return }
+    const { data, error } = await supabase.storage.from('payment-proofs').createSignedUrl(path, 60)
+    if (error || !data?.signedUrl) { setError('Couldn’t open the screenshot.'); return }
+    window.open(data.signedUrl, '_blank', 'noopener,noreferrer')
+  }
+
   return (
     <div className="admin-orders">
       <p className="admin-orders__note">
-        Read-only view. Order status is managed by the order service (coming soon).
+        Read-only, except GCash payment verification. Verify a submitted payment
+        to send the order into the vendor's queue.
       </p>
-      <div className="admin-table" role="table" aria-label="All orders">
+      <div className="admin-table admin-table--orders" role="table" aria-label="All orders">
         <div className="admin-table__head" role="row">
           <span role="columnheader">Code</span>
           <span role="columnheader">Vendor</span>
           <span role="columnheader">Pickup</span>
           <span role="columnheader">Status</span>
-          <span role="columnheader">Subtotal</span>
           <span role="columnheader">Total</span>
           <span role="columnheader">Placed</span>
+          <span role="columnheader">Payment</span>
         </div>
-        {rows.map((o) => (
-          <div className="admin-table__row" role="row" key={o.code}>
-            <span role="cell" data-label="Code" className="admin-table__code">
-              {o.code}
-            </span>
-            <span role="cell" data-label="Vendor">
-              {vendorName(o.vendor_id)}
-            </span>
-            <span role="cell" data-label="Pickup">
-              {o.pickup_name}
-            </span>
-            <span role="cell" data-label="Status">
-              <span className={`admin-status admin-status--${o.status}`}>{o.status}</span>
-            </span>
-            <span role="cell" data-label="Subtotal">
-              {PESO(o.subtotal)}
-            </span>
-            <span role="cell" data-label="Total">
-              {PESO(o.total)}
-            </span>
-            <span role="cell" data-label="Placed">
-              {fmtDate(o.placed_at)}
-            </span>
-          </div>
-        ))}
+        {rows.map((o) => {
+          const busy = busyId === o.id
+          const isSubmitted = o.status === 'payment_submitted'
+          const isAwaiting = o.status === 'awaiting_payment'
+          return (
+            <div className="admin-table__row" role="row" key={o.id}>
+              <span role="cell" data-label="Code" className="admin-table__code">
+                {o.code}
+              </span>
+              <span role="cell" data-label="Vendor">
+                {vendorName(o.vendor_id)}
+              </span>
+              <span role="cell" data-label="Pickup">
+                {o.pickup_name}
+              </span>
+              <span role="cell" data-label="Status">
+                <span className={`admin-status admin-status--${o.status}`}>{o.status}</span>
+              </span>
+              <span role="cell" data-label="Total">
+                {PESO(o.total)}
+              </span>
+              <span role="cell" data-label="Placed">
+                {fmtDate(o.placed_at)}
+              </span>
+              <span role="cell" data-label="Payment" className="admin-orders__pay">
+                {isSubmitted || isAwaiting ? (
+                  <>
+                    {isSubmitted && (
+                      <>
+                        <span className="admin-orders__ref">
+                          Ref: {o.gcash_reference || '—'}
+                        </span>
+                        <button type="button" className="btn btn--ghost admin-btn-sm" onClick={() => viewScreenshot(o.payment_screenshot_path)}>
+                          Screenshot
+                        </button>
+                        <button type="button" className="btn btn--primary admin-btn-sm" onClick={() => verify(o.id)} disabled={busy}>
+                          Verify
+                        </button>
+                        <button type="button" className="btn btn--ghost admin-btn-sm admin-danger" onClick={() => reject(o.id)} disabled={busy}>
+                          Reject
+                        </button>
+                      </>
+                    )}
+                    <button type="button" className="btn btn--ghost admin-btn-sm admin-danger" onClick={() => cancel(o.id)} disabled={busy}>
+                      Cancel
+                    </button>
+                  </>
+                ) : (
+                  <span className="admin-orders__dash">—</span>
+                )}
+              </span>
+            </div>
+          )
+        })}
       </div>
     </div>
   )

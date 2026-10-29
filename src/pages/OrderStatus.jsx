@@ -3,7 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import Icon from '../components/Icon'
 import { useVendors } from '../context/VendorContext'
 import { supabase } from '../lib/supabase'
-import { transitionOrder } from '../lib/api'
+import { submitPayment, transitionOrder } from '../lib/api'
 import './OrderStatus.css'
 
 const Peso = ({ value }) => (
@@ -14,6 +14,7 @@ const Peso = ({ value }) => (
 )
 
 const STEPS = [
+  { key: 'payment', label: 'Payment', desc: 'Pay via GCash to confirm' },
   { key: 'pending', label: 'Pending', desc: 'Sent to the vendor' },
   { key: 'accepted', label: 'Accepted', desc: 'Vendor is preparing your order' },
   { key: 'ready', label: 'Ready for pickup', desc: 'Head to the stall' },
@@ -21,6 +22,30 @@ const STEPS = [
 ]
 
 const STATE_UI = {
+  payment: {
+    tone: 'payment',
+    icon: 'peso',
+    title: 'Payment required',
+    pill: 'Awaiting payment',
+    subtitle: (o) => (
+      <>
+        Pay for order <strong>{o.id}</strong> via GCash and submit your reference
+        number to send it to <strong>{o.vendorName}</strong>.
+      </>
+    ),
+  },
+  payment_submitted: {
+    tone: 'payment',
+    icon: 'clock',
+    title: 'Payment submitted',
+    pill: 'Checking payment',
+    subtitle: (o) => (
+      <>
+        Waiting for <strong>{o.vendorName}</strong> to confirm your payment for
+        order <strong>{o.id}</strong>.
+      </>
+    ),
+  },
   pending: {
     tone: 'pending',
     icon: 'clock',
@@ -74,6 +99,8 @@ const STATE_UI = {
 // Map the DB order status to the UI step key (the tracker has no separate
 // 'preparing' step — a preparing order is shown as 'accepted').
 const DB_STATUS_TO_STEP = {
+  awaiting_payment: 'payment',
+  payment_submitted: 'payment',
   pending: 'pending',
   preparing: 'accepted',
   ready: 'ready',
@@ -124,6 +151,114 @@ function ReviewForm({ onSubmit }) {
   )
 }
 
+// Simple filename sanitiser for the Storage object key (keeps the extension).
+const safeName = (name) => (name || 'proof').replace(/[^a-zA-Z0-9._-]/g, '_').slice(-60)
+
+// Payment step for an awaiting_payment order: shows the vendor's GCash details
+// and a required reference input + optional screenshot upload. The screenshot is
+// uploaded to the private 'payment-proofs' bucket under `${uuid}/${filename}`
+// first; on upload failure we fall back to reference-only. Then submitPayment is
+// called and the order refreshed.
+function PaymentForm({ order, vendor, onSubmitted }) {
+  const [reference, setReference] = useState('')
+  const [file, setFile] = useState(null)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const [notice, setNotice] = useState('')
+
+  const submit = async (e) => {
+    e.preventDefault()
+    const trimmed = reference.trim()
+    if (!trimmed) {
+      setError('Enter the GCash reference number from your payment.')
+      return
+    }
+    setBusy(true)
+    setError('')
+    setNotice('')
+
+    let screenshotPath = null
+    if (file) {
+      const path = `${order.uuid}/${Date.now()}-${safeName(file.name)}`
+      const { error: upErr } = await supabase.storage
+        .from('payment-proofs')
+        .upload(path, file, { upsert: false })
+      if (upErr) {
+        // Screenshot is optional — proceed with reference only.
+        setNotice("Couldn't upload your screenshot; submitting the reference number without it.")
+      } else {
+        screenshotPath = path
+      }
+    }
+
+    try {
+      await submitPayment(order.uuid, { gcashReference: trimmed, screenshotPath })
+      await onSubmitted()
+    } catch (err) {
+      setError(
+        err?.code === 'ILLEGAL_TRANSITION'
+          ? 'This order is no longer awaiting payment — refreshing.'
+          : err?.message || 'We couldn’t submit your payment. Please try again.'
+      )
+      if (err?.code === 'ILLEGAL_TRANSITION') await onSubmitted()
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="order-pay">
+      {order.paymentRejectedReason && (
+        <p className="order-pay__rejected" role="alert">
+          Your last payment was rejected: {order.paymentRejectedReason}. Please
+          check the details and submit again.
+        </p>
+      )}
+
+      <div className="order-pay__gcash">
+        <p className="order-pay__gcash-label">Send exactly</p>
+        <p className="order-pay__gcash-amount"><Peso value={order.total} /></p>
+        <p className="order-pay__gcash-to">
+          via GCash to{' '}
+          <strong>{vendor.gcashNumber}</strong>
+          {vendor.gcashName && <> ({vendor.gcashName})</>}
+        </p>
+      </div>
+
+      <form className="order-pay__form" onSubmit={submit}>
+        <div className="field">
+          <label htmlFor="gcash-ref">GCash reference number (required)</label>
+          <input
+            id="gcash-ref"
+            className="input"
+            value={reference}
+            onChange={(e) => setReference(e.target.value)}
+            placeholder="e.g. 1234 5678 90"
+            inputMode="numeric"
+            required
+          />
+        </div>
+        <div className="field">
+          <label htmlFor="gcash-shot">Screenshot (optional)</label>
+          <input
+            id="gcash-shot"
+            className="input"
+            type="file"
+            accept="image/*"
+            onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+          />
+        </div>
+
+        {notice && <p className="order-pay__notice" role="status">{notice}</p>}
+        {error && <p className="order-review__error" role="alert">{error}</p>}
+
+        <button type="submit" className="order-btn order-btn--primary order-btn--block" disabled={busy}>
+          {busy ? 'Submitting…' : 'I’ve paid — submit reference'}
+        </button>
+      </form>
+    </div>
+  )
+}
+
 export default function OrderStatus() {
   const { id } = useParams()
   const { getVendor } = useVendors()
@@ -139,7 +274,7 @@ export default function OrderStatus() {
   const fetchOrder = useCallback(async () => {
     const { data, error } = await supabase
       .from('orders')
-      .select('id, code, vendor_id, status, total, pickup_name, note, order_items(name, qty, unit_price)')
+      .select('id, code, vendor_id, status, total, pickup_name, note, gcash_reference, payment_submitted_at, payment_rejected_reason, order_items(name, qty, unit_price)')
       .eq('id', id)
       .single()
     if (error || !data) return null
@@ -151,6 +286,9 @@ export default function OrderStatus() {
       total: data.total,
       pickupName: data.pickup_name,
       note: data.note,
+      gcashReference: data.gcash_reference,
+      paymentSubmittedAt: data.payment_submitted_at,
+      paymentRejectedReason: data.payment_rejected_reason,
       lines: (data.order_items ?? []).map((oi) => ({ name: oi.name, qty: oi.qty, price: oi.unit_price })),
     }
   }, [id])
@@ -218,15 +356,24 @@ export default function OrderStatus() {
   }
 
   /* ---------- Derived values ---------- */
-  // A cancelled order has no tracker step; show it as pending-looking but blocked.
+  // A cancelled order has no tracker step; show it as payment-looking but blocked.
   const stepKey = DB_STATUS_TO_STEP[order.status] ?? 'pending'
   const stepIndex = Math.max(0, STEPS.findIndex((s) => s.key === stepKey))
   const current = STEPS[stepIndex]
-  const ui = STATE_UI[current.key]
+  const isAwaitingPayment = order.status === 'awaiting_payment'
+  const isPaymentSubmitted = order.status === 'payment_submitted'
+  // In the payment step, the two DB states map to distinct copy; elsewhere the
+  // UI is keyed off the tracker step.
+  const ui = isAwaitingPayment
+    ? STATE_UI.payment
+    : isPaymentSubmitted
+    ? STATE_UI.payment_submitted
+    : STATE_UI[current.key]
   const isPending = current.key === 'pending'
   const isCompleted = current.key === 'completed'
 
-  // Vendor record gives us location + hours.
+  // Vendor record gives us location + hours. PINNED: full-list getVendor, so an
+  // in-flight order still resolves even if the store was suspended mid-flow.
   const vendor = order.vendorId && getVendor(order.vendorId)
   const vendorName = vendor?.name ?? 'the vendor'
   const orderForUi = { ...order, vendorName }
@@ -360,13 +507,65 @@ export default function OrderStatus() {
             <div className="order-receipt__total">
               <div>
                 <p className="order-receipt__total-label">Total</p>
-                <p className="order-receipt__total-sub">Cash on pickup</p>
+                <p className="order-receipt__total-sub">Pay via GCash</p>
               </div>
               <strong className="order-receipt__total-amt"><Peso value={order.total} /></strong>
             </div>
 
-            {/* Actions: Pending = Cancel (Phase-C placeholder), Accepted/Ready = Contact, Completed = Reorder + Review */}
+            {/* Actions: Payment = pay form / waiting + Cancel, Pending = Cancel,
+                Accepted/Ready = Contact, Completed = Reorder + Review */}
             <div className="order-actions">
+              {isAwaitingPayment && (
+                <>
+                  {vendor && vendor.gcashNumber ? (
+                    <PaymentForm
+                      order={order}
+                      vendor={vendor}
+                      onSubmitted={async () => {
+                        const refreshed = await fetchOrder()
+                        if (refreshed) setOrder(refreshed)
+                      }}
+                    />
+                  ) : (
+                    <p className="order-pay__unavailable" role="status">
+                      This vendor's payment details are unavailable right now.
+                      Please contact the vendor before paying.
+                    </p>
+                  )}
+                  <button
+                    type="button"
+                    className="order-btn order-btn--outline order-btn--block"
+                    onClick={cancelOrder}
+                    disabled={cancelling}
+                  >
+                    {cancelling ? 'Cancelling…' : 'Cancel order'}
+                  </button>
+                  {cancelError && (
+                    <p className="order-review__error" role="alert">{cancelError}</p>
+                  )}
+                </>
+              )}
+
+              {isPaymentSubmitted && (
+                <>
+                  <p className="order-pay__waiting" role="status">
+                    Payment submitted{order.gcashReference ? <> — reference <strong>{order.gcashReference}</strong></> : null}.
+                    Waiting for the vendor to confirm.
+                  </p>
+                  <button
+                    type="button"
+                    className="order-btn order-btn--outline order-btn--block"
+                    onClick={cancelOrder}
+                    disabled={cancelling}
+                  >
+                    {cancelling ? 'Cancelling…' : 'Cancel order'}
+                  </button>
+                  {cancelError && (
+                    <p className="order-review__error" role="alert">{cancelError}</p>
+                  )}
+                </>
+              )}
+
               {isPending && (
                 <>
                   <button

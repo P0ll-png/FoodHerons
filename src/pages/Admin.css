@@ -302,6 +302,31 @@
   padding: 12px 16px;
 }
 
+/* Orders table: Code/Vendor/Pickup/Status/Total/Placed + a wide Payment actions column. */
+.admin-table--orders .admin-table__head,
+.admin-table--orders .admin-table__row {
+  grid-template-columns: 110px minmax(120px, 1.2fr) minmax(90px, 1fr) 130px 90px 150px minmax(220px, 1.4fr);
+}
+
+.admin-orders__pay {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.admin-orders__ref {
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+  margin-right: 2px;
+}
+.admin-orders__dash {
+  color: var(--text-muted);
+}
+
+/* New GCash pre-order statuses (orange/yellow, no blue). */
+.admin-status--awaiting_payment { background: var(--yellow, #fff2cc); color: #8a5a00; }
+.admin-status--payment_submitted { background: var(--orange-soft, #ffe6d5); color: var(--orange-dark, #b4420f); }
+
 .admin-table__head {
   background: var(--surface);
   font-size: var(--fs-xs);

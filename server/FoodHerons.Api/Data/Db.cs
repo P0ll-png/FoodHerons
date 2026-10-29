@@ -33,7 +33,12 @@ public sealed record OrderRow(
     DateTimeOffset? ReadyAt,
     DateTimeOffset? CompletedAt,
     DateTimeOffset? CancelledAt,
-    string? CancelReason);
+    string? CancelReason,
+    string? GcashReference,
+    DateTimeOffset? PaymentSubmittedAt,
+    DateTimeOffset? PaymentVerifiedAt,
+    string? PaymentRejectedReason,
+    string? PaymentScreenshotPath);
 
 /// <summary>Input for a single persisted order line.</summary>
 public sealed record OrderItemInput(string MenuItemId, string VendorId, string Name, decimal UnitPrice, int Qty);
@@ -165,9 +170,10 @@ public sealed class Db(HttpClient http)
         Guid orderId,
         string to,
         string? reason,
+        Guid actor,
         CancellationToken ct)
     {
-        var body = new TransitionRpcBody(orderId, to, reason);
+        var body = new TransitionRpcBody(orderId, to, reason, actor);
 
         using var response = await _http.PostAsJsonAsync("rpc/transition_order", body, JsonOptions, ct);
 
@@ -184,6 +190,40 @@ public sealed class Db(HttpClient http)
             "FH001" => Result<OrderRow>.Fail(new DomainError(409, ErrorCodes.IllegalTransition, "That status change is not allowed.")),
             "FH002" => Result<OrderRow>.Fail(new DomainError(404, "NOT_FOUND", "Order not found.")),
             _ => throw Fatal("transition_order", response.StatusCode),
+        };
+    }
+
+    /// <summary>
+    /// Submits a student's GCash payment proof atomically via the
+    /// <c>submit_payment</c> RPC, which locks the order, requires it to be
+    /// <c>awaiting_payment</c>, stamps the reference/screenshot/submitted-at, and
+    /// moves it to <c>payment_submitted</c>. Same error contract as
+    /// <see cref="ApplyTransitionAsync"/>: the body <c>code</c> field maps
+    /// <c>FH001</c> -&gt; ILLEGAL_TRANSITION, <c>FH002</c> -&gt; NOT_FOUND;
+    /// anything else is fatal.
+    /// </summary>
+    public async Task<Result<OrderRow>> SubmitPaymentAsync(
+        Guid id,
+        string reference,
+        string? screenshotPath,
+        CancellationToken ct)
+    {
+        var body = new SubmitPaymentRpcBody(id, reference, screenshotPath);
+
+        using var response = await _http.PostAsJsonAsync("rpc/submit_payment", body, JsonOptions, ct);
+
+        if (response.IsSuccessStatusCode)
+        {
+            var row = await ReadObjectAsync<OrderRowDto>(response, "submit_payment", ct);
+            return Result<OrderRow>.Ok(ToOrderRow(row));
+        }
+
+        var code = await TryReadErrorCodeAsync(response, ct);
+        return code switch
+        {
+            "FH001" => Result<OrderRow>.Fail(new DomainError(409, ErrorCodes.IllegalTransition, "That status change is not allowed.")),
+            "FH002" => Result<OrderRow>.Fail(new DomainError(404, "NOT_FOUND", "Order not found.")),
+            _ => throw Fatal("submit_payment", response.StatusCode),
         };
     }
 
@@ -242,7 +282,8 @@ public sealed class Db(HttpClient http)
 
     private static OrderRow ToOrderRow(OrderRowDto r) => new(
         r.Id, r.Code, r.Status, r.VendorId, r.Subtotal, r.Total,
-        r.PlacedAt, r.AcceptedAt, r.ReadyAt, r.CompletedAt, r.CancelledAt, r.CancelReason);
+        r.PlacedAt, r.AcceptedAt, r.ReadyAt, r.CompletedAt, r.CancelledAt, r.CancelReason,
+        r.GcashReference, r.PaymentSubmittedAt, r.PaymentVerifiedAt, r.PaymentRejectedReason, r.PaymentScreenshotPath);
 
     private static string QuoteInValue(string id)
     {
@@ -285,7 +326,12 @@ public sealed class Db(HttpClient http)
         [property: JsonPropertyName("ready_at")] DateTimeOffset? ReadyAt,
         [property: JsonPropertyName("completed_at")] DateTimeOffset? CompletedAt,
         [property: JsonPropertyName("cancelled_at")] DateTimeOffset? CancelledAt,
-        [property: JsonPropertyName("cancel_reason")] string? CancelReason);
+        [property: JsonPropertyName("cancel_reason")] string? CancelReason,
+        [property: JsonPropertyName("gcash_reference")] string? GcashReference = null,
+        [property: JsonPropertyName("payment_submitted_at")] DateTimeOffset? PaymentSubmittedAt = null,
+        [property: JsonPropertyName("payment_verified_at")] DateTimeOffset? PaymentVerifiedAt = null,
+        [property: JsonPropertyName("payment_rejected_reason")] string? PaymentRejectedReason = null,
+        [property: JsonPropertyName("payment_screenshot_path")] string? PaymentScreenshotPath = null);
 
     private sealed record PostgrestError(
         [property: JsonPropertyName("code")] string? Code,
@@ -310,5 +356,11 @@ public sealed class Db(HttpClient http)
     private sealed record TransitionRpcBody(
         [property: JsonPropertyName("p_id")] Guid Id,
         [property: JsonPropertyName("p_to")] string To,
-        [property: JsonPropertyName("p_reason")] string? Reason);
+        [property: JsonPropertyName("p_reason")] string? Reason,
+        [property: JsonPropertyName("p_actor")] Guid Actor);
+
+    private sealed record SubmitPaymentRpcBody(
+        [property: JsonPropertyName("p_id")] Guid Id,
+        [property: JsonPropertyName("p_reference")] string Reference,
+        [property: JsonPropertyName("p_screenshot_path")] string? ScreenshotPath);
 }

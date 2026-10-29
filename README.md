@@ -3,7 +3,7 @@
 Campus food vendor discovery and pre-ordering web app for the University of
 Makati (UMAK). Students browse every food vendor near and within campus —
 including student-run sellers — and pre-order where available. Pickup only,
-cash on pickup.
+paid ahead via GCash.
 
 > **Tagline:** Campus food, found fast.
 
@@ -26,10 +26,11 @@ database (MySQL via Supabase) are separate.
 | `/`            | Vendor directory — search, category + area filters, open-now |
 | `/vendor/:id`  | Store page (pre-order flow **or** listing-only by vendor)  |
 | `/cart`        | Review pre-order, pickup details, place order              |
-| `/order/:id`   | Order status tracker (pending → ready → completed)         |
-| `/dashboard`   | Vendor dashboard — orders, menu, profile, pre-order toggle |
+| `/order/:id`   | Order status tracker (pay via GCash → pending → ready → completed) |
+| `/dashboard`   | Vendor dashboard — orders, GCash payment verification, menu, profile, pre-order toggle, revenue PDF export |
+| `/admin`       | Admin console — approve/suspend stores, manage users + orders, verify payments |
 | `/login`       | Log in                                                     |
-| `/signup`      | Self-service signup (student or vendor, no approval step)  |
+| `/signup`      | Self-service signup; new vendor stores require admin approval before they appear to students |
 
 ## Getting started
 
@@ -44,5 +45,11 @@ npm run preview  # preview the production build
 
 - Data is mocked in `src/data/vendors.js` for the frontend. Wire these to the
   C# API when the backend is ready.
-- No online payment — orders are reservations settled in cash at pickup.
+- GCash-gated pre-orders (manual verification, no gateway): placing a pre-order
+  creates it `awaiting_payment`. The student pays via the vendor's GCash number
+  and submits a reference (screenshot optional); the order moves to
+  `payment_submitted`. A vendor or admin verifies it into the normal queue. An
+  unverified order never reaches the active queue.
+- Vendors can export their revenue (completed orders only) as a client-side PDF
+  from the dashboard over a selectable date range.
 - Auth pages are frontend-only stubs; connect to real auth later.

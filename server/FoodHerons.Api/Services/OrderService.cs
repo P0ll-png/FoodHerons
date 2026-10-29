@@ -24,6 +24,8 @@ public sealed class OrderService
     public const int QtyMin = 1;
     public const int QtyMax = 99;
     public const int ReasonMax = 140;
+    public const int GcashRefMin = 4;
+    public const int GcashRefMax = 40;
 
     // ===================================================================
     // Place-order input validation
@@ -150,20 +152,27 @@ public sealed class OrderService
     // ===================================================================
 
     // Legal transitions, EXACTLY (design §4).
-    private static readonly HashSet<(string From, string To)> Legal = new()
+    public static readonly HashSet<(string From, string To)> Legal = new()
     {
         (OrderStatuses.Pending, OrderStatuses.Preparing),
         (OrderStatuses.Preparing, OrderStatuses.Ready),
         (OrderStatuses.Ready, OrderStatuses.Completed),
         (OrderStatuses.Pending, OrderStatuses.Cancelled),
         (OrderStatuses.Preparing, OrderStatuses.Cancelled),
+        // GCash-gated pre-order states (design §4.2).
+        (OrderStatuses.PaymentSubmitted, OrderStatuses.Pending),
+        (OrderStatuses.PaymentSubmitted, OrderStatuses.AwaitingPayment),
+        (OrderStatuses.AwaitingPayment, OrderStatuses.Cancelled),
+        (OrderStatuses.PaymentSubmitted, OrderStatuses.Cancelled),
     };
 
     /// <summary>
-    /// Validates a status transition and classifies it as a vendor action or a
-    /// student cancel. A student cancel (pending -&gt; cancelled) is the only
-    /// student-driven move; everything else is a vendor action. Returns an
-    /// ILLEGAL_TRANSITION error for any skip/backward/terminal move.
+    /// Validates a status transition and classifies it for authorization routing.
+    /// A student cancel (pending/awaiting_payment/payment_submitted -&gt; cancelled)
+    /// is student/vendor/admin-driven; a payment review (payment_submitted -&gt;
+    /// pending / awaiting_payment) is vendor-owner-or-admin; everything else is a
+    /// vendor action. Returns an ILLEGAL_TRANSITION error for any
+    /// skip/backward/terminal move.
     /// </summary>
     public Result<TransitionPlan> PlanTransition(string from, string to)
     {
@@ -173,31 +182,74 @@ public sealed class OrderService
         if (!Legal.Contains((from, to)))
             return Result<TransitionPlan>.Fail(IllegalTransition(from, to));
 
-        var kind = from == OrderStatuses.Pending && to == OrderStatuses.Cancelled
-            ? TransitionKind.StudentCancel   // also reachable by a vendor reject-from-pending
-            : TransitionKind.VendorAction;
+        TransitionKind kind;
+        if (from == OrderStatuses.PaymentSubmitted &&
+            (to == OrderStatuses.Pending || to == OrderStatuses.AwaitingPayment))
+        {
+            // Verify (-> pending) / reject (-> awaiting_payment): vendor owner or admin.
+            kind = TransitionKind.PaymentReview;
+        }
+        else if (to == OrderStatuses.Cancelled &&
+                 (from == OrderStatuses.Pending ||
+                  from == OrderStatuses.AwaitingPayment ||
+                  from == OrderStatuses.PaymentSubmitted))
+        {
+            // Student owner / vendor owner / (pre-payment only) admin cancel.
+            kind = TransitionKind.StudentCancel;
+        }
+        else
+        {
+            kind = TransitionKind.VendorAction;
+        }
 
         return Result<TransitionPlan>.Ok(new TransitionPlan(from, to, kind));
     }
 
     /// <summary>
     /// Validates a transition request body (reason rules). Returns null on success.
-    /// A reason is required iff to == cancelled and must be at most 140 chars.
+    /// Three buckets (design §4.4): a reason is REQUIRED when cancelling or
+    /// rejecting payment (to == cancelled or awaiting_payment), FORBIDDEN
+    /// otherwise (including the verify move to == pending and all forward moves),
+    /// and must be at most <see cref="ReasonMax"/> chars.
     /// </summary>
     public DomainError? ValidateTransition(TransitionRequest request)
     {
         if (!OrderStatuses.IsValid(request.To))
             return Invalid("to", "to must be a valid order status.");
 
-        var isCancel = request.To == OrderStatuses.Cancelled;
+        var reasonRequired =
+            request.To is OrderStatuses.Cancelled or OrderStatuses.AwaitingPayment;
         var reason = request.Reason?.Trim();
 
-        if (isCancel && string.IsNullOrWhiteSpace(reason))
-            return Invalid("reason", "reason is required when cancelling.");
-        if (!isCancel && !string.IsNullOrEmpty(request.Reason))
-            return Invalid("reason", "reason is only allowed when cancelling.");
+        if (reasonRequired && string.IsNullOrWhiteSpace(reason))
+            return Invalid("reason", "reason is required when cancelling or rejecting payment.");
+        if (!reasonRequired && !string.IsNullOrEmpty(request.Reason))
+            return Invalid("reason", "reason is only allowed when cancelling or rejecting payment.");
         if (reason is not null && reason.Length > ReasonMax)
             return Invalid("reason", $"reason must be at most {ReasonMax} characters.");
+
+        return null;
+    }
+
+    /// <summary>
+    /// Validates a <see cref="SubmitPaymentRequest"/>'s reference-string rules
+    /// (design §4.4/§4.6). The GCash reference is required, trimmed to
+    /// <see cref="GcashRefMin"/>-<see cref="GcashRefMax"/> chars, and may contain
+    /// only digits, spaces and hyphens. The screenshotPath shape/route-id check
+    /// is NOT performed here (it needs the route id) — it lives at the endpoint.
+    /// Returns null on success or a 422 <see cref="DomainError"/> with field
+    /// "gcashReference".
+    /// </summary>
+    public DomainError? ValidateSubmitPayment(SubmitPaymentRequest request)
+    {
+        var reference = request.GcashReference?.Trim();
+
+        if (string.IsNullOrWhiteSpace(reference))
+            return Invalid("gcashReference", "gcashReference is required.");
+        if (reference.Length < GcashRefMin || reference.Length > GcashRefMax)
+            return Invalid("gcashReference", $"gcashReference must be {GcashRefMin}-{GcashRefMax} characters after trimming.");
+        if (!reference.All(c => char.IsDigit(c) || c == ' ' || c == '-'))
+            return Invalid("gcashReference", "gcashReference may contain only digits, spaces and hyphens.");
 
         return null;
     }

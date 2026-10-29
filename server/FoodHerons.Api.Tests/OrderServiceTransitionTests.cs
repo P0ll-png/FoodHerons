@@ -15,6 +15,11 @@ public class OrderServiceTransitionTests
     [InlineData("ready", "completed")]
     [InlineData("pending", "cancelled")]
     [InlineData("preparing", "cancelled")]
+    // GCash-gated pre-order pairs.
+    [InlineData("payment_submitted", "pending")]
+    [InlineData("payment_submitted", "awaiting_payment")]
+    [InlineData("awaiting_payment", "cancelled")]
+    [InlineData("payment_submitted", "cancelled")]
     public void Legal_transitions_allowed(string from, string to)
     {
         var result = _svc.PlanTransition(from, to);
@@ -39,6 +44,10 @@ public class OrderServiceTransitionTests
     [InlineData("cancelled", "preparing")]
     // ready cannot be cancelled
     [InlineData("ready", "cancelled")]
+    // pre-payment states cannot skip verification into the active queue
+    [InlineData("awaiting_payment", "preparing")]
+    [InlineData("payment_submitted", "ready")]
+    [InlineData("awaiting_payment", "completed")]
     public void Illegal_transitions_rejected(string from, string to)
     {
         var result = _svc.PlanTransition(from, to);
@@ -69,6 +78,26 @@ public class OrderServiceTransitionTests
         var result = _svc.PlanTransition(from, to);
         Assert.True(result.IsSuccess);
         Assert.Equal(TransitionKind.VendorAction, result.Value!.Kind);
+    }
+
+    [Theory]
+    [InlineData("payment_submitted", "pending")]
+    [InlineData("payment_submitted", "awaiting_payment")]
+    public void Payment_review_moves_classified_as_payment_review(string from, string to)
+    {
+        var result = _svc.PlanTransition(from, to);
+        Assert.True(result.IsSuccess);
+        Assert.Equal(TransitionKind.PaymentReview, result.Value!.Kind);
+    }
+
+    [Theory]
+    [InlineData("awaiting_payment", "cancelled")]
+    [InlineData("payment_submitted", "cancelled")]
+    public void Pre_payment_cancels_classified_as_student_cancel(string from, string to)
+    {
+        var result = _svc.PlanTransition(from, to);
+        Assert.True(result.IsSuccess);
+        Assert.Equal(TransitionKind.StudentCancel, result.Value!.Kind);
     }
 
     [Fact]

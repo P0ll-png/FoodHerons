@@ -227,7 +227,8 @@ public class DbSupabaseTests
             """);
         var db = MakeDb(stub);
 
-        var result = await db.ApplyTransitionAsync(Svc, Guid.NewGuid(), "preparing", null, default);
+        var actor = Guid.NewGuid();
+        var result = await db.ApplyTransitionAsync(Svc, Guid.NewGuid(), "preparing", null, actor, default);
 
         Assert.True(result.IsSuccess);
         Assert.Equal("preparing", result.Value!.Status);
@@ -237,6 +238,7 @@ public class DbSupabaseTests
         Assert.Contains("rpc/transition_order", stub.LastRequest.RequestUri!.ToString());
         using var sent = JsonDocument.Parse(stub.LastRequestBody!);
         Assert.Equal("preparing", sent.RootElement.GetProperty("p_to").GetString());
+        Assert.Equal(actor.ToString(), sent.RootElement.GetProperty("p_actor").GetString());
     }
 
     [Fact]
@@ -244,7 +246,7 @@ public class DbSupabaseTests
     {
         var db = MakeDb(Json(HttpStatusCode.BadRequest, """{"code":"FH001","message":"illegal transition"}"""));
 
-        var result = await db.ApplyTransitionAsync(Svc, Guid.NewGuid(), "completed", null, default);
+        var result = await db.ApplyTransitionAsync(Svc, Guid.NewGuid(), "completed", null, Guid.NewGuid(), default);
 
         Assert.False(result.IsSuccess);
         Assert.Equal(ErrorCodes.IllegalTransition, result.Error!.Code);
@@ -256,7 +258,7 @@ public class DbSupabaseTests
     {
         var db = MakeDb(Json(HttpStatusCode.BadRequest, """{"code":"FH002","message":"order not found"}"""));
 
-        var result = await db.ApplyTransitionAsync(Svc, Guid.NewGuid(), "preparing", null, default);
+        var result = await db.ApplyTransitionAsync(Svc, Guid.NewGuid(), "preparing", null, Guid.NewGuid(), default);
 
         Assert.False(result.IsSuccess);
         Assert.Equal("NOT_FOUND", result.Error!.Code);
@@ -270,7 +272,7 @@ public class DbSupabaseTests
         // Here a non-400 (500) status still carries an FH001 body.
         var db = MakeDb(Json(HttpStatusCode.InternalServerError, """{"code":"FH001","message":"illegal"}"""));
 
-        var result = await db.ApplyTransitionAsync(Svc, Guid.NewGuid(), "completed", null, default);
+        var result = await db.ApplyTransitionAsync(Svc, Guid.NewGuid(), "completed", null, Guid.NewGuid(), default);
 
         Assert.False(result.IsSuccess);
         Assert.Equal(ErrorCodes.IllegalTransition, result.Error!.Code);
@@ -282,7 +284,7 @@ public class DbSupabaseTests
         var db = MakeDb(Json(HttpStatusCode.BadRequest, """{"code":"23514","message":"check violation"}"""));
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            db.ApplyTransitionAsync(Svc, Guid.NewGuid(), "preparing", null, default));
+            db.ApplyTransitionAsync(Svc, Guid.NewGuid(), "preparing", null, Guid.NewGuid(), default));
     }
 
     [Fact]
@@ -291,7 +293,67 @@ public class DbSupabaseTests
         var db = MakeDb(Json(HttpStatusCode.BadGateway, "<html>502</html>"));
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            db.ApplyTransitionAsync(Svc, Guid.NewGuid(), "preparing", null, default));
+            db.ApplyTransitionAsync(Svc, Guid.NewGuid(), "preparing", null, Guid.NewGuid(), default));
+    }
+
+    // ===================================================================
+    // SubmitPaymentAsync (submit_payment RPC)
+    // ===================================================================
+
+    [Fact]
+    public async Task SubmitPaymentAsync_success_returns_ok()
+    {
+        var stub = Json(HttpStatusCode.OK, """
+            {"id":"66666666-6666-6666-6666-666666666666","code":"FH-000300","status":"payment_submitted",
+             "vendor_id":"tita-nenas","subtotal":42.00,"total":42.00,
+             "placed_at":"2026-10-27T05:00:00+00:00","accepted_at":null,"ready_at":null,
+             "completed_at":null,"cancelled_at":null,"cancel_reason":null,
+             "gcash_reference":"1234 5678","payment_submitted_at":"2026-10-27T05:10:00+00:00",
+             "payment_verified_at":null,"payment_rejected_reason":null,
+             "payment_screenshot_path":"66666666-6666-6666-6666-666666666666/proof.jpg"}
+            """);
+        var db = MakeDb(stub);
+
+        var orderId = Guid.Parse("66666666-6666-6666-6666-666666666666");
+        var result = await db.SubmitPaymentAsync(orderId, "1234 5678",
+            "66666666-6666-6666-6666-666666666666/proof.jpg", default);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("payment_submitted", result.Value!.Status);
+        Assert.Equal("1234 5678", result.Value.GcashReference);
+        Assert.NotNull(result.Value.PaymentSubmittedAt);
+
+        Assert.Equal(HttpMethod.Post, stub.LastRequest!.Method);
+        Assert.Contains("rpc/submit_payment", stub.LastRequest.RequestUri!.ToString());
+        using var sent = JsonDocument.Parse(stub.LastRequestBody!);
+        Assert.Equal(orderId.ToString(), sent.RootElement.GetProperty("p_id").GetString());
+        Assert.Equal("1234 5678", sent.RootElement.GetProperty("p_reference").GetString());
+        Assert.Equal("66666666-6666-6666-6666-666666666666/proof.jpg",
+            sent.RootElement.GetProperty("p_screenshot_path").GetString());
+    }
+
+    [Fact]
+    public async Task SubmitPaymentAsync_FH001_maps_to_illegal_transition()
+    {
+        var db = MakeDb(Json(HttpStatusCode.BadRequest, """{"code":"FH001","message":"not awaiting payment"}"""));
+
+        var result = await db.SubmitPaymentAsync(Guid.NewGuid(), "1234", null, default);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal(ErrorCodes.IllegalTransition, result.Error!.Code);
+        Assert.Equal(409, result.Error.Status);
+    }
+
+    [Fact]
+    public async Task SubmitPaymentAsync_FH002_maps_to_not_found()
+    {
+        var db = MakeDb(Json(HttpStatusCode.BadRequest, """{"code":"FH002","message":"order not found"}"""));
+
+        var result = await db.SubmitPaymentAsync(Guid.NewGuid(), "1234", null, default);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("NOT_FOUND", result.Error!.Code);
+        Assert.Equal(404, result.Error.Status);
     }
 
     // ===================================================================
@@ -299,17 +361,22 @@ public class DbSupabaseTests
     // ===================================================================
 
     [Fact]
-    public void LegalTransitionSet_matches_0007_sql_whitelist()
+    public void LegalTransitionSet_matches_sql_whitelist()
     {
-        // The 5 pairs copied verbatim from supabase/migrations/0007_order_rpcs.sql
-        // transition_order's whitelist. A mismatch with OrderService.Legal fails here.
+        // The 9 pairs copied verbatim from supabase/migrations/0010_order_payment.sql
+        // transition_order's whitelist (the create-or-replace that now carries the
+        // effective set). A mismatch with OrderService.Legal fails here.
         var sqlWhitelist = new HashSet<(string From, string To)>
         {
-            ("pending",   "preparing"),
-            ("preparing", "ready"),
-            ("ready",     "completed"),
-            ("pending",   "cancelled"),
-            ("preparing", "cancelled"),
+            ("pending",           "preparing"),
+            ("preparing",         "ready"),
+            ("ready",             "completed"),
+            ("pending",           "cancelled"),
+            ("preparing",         "cancelled"),
+            ("payment_submitted", "pending"),
+            ("payment_submitted", "awaiting_payment"),
+            ("awaiting_payment",  "cancelled"),
+            ("payment_submitted", "cancelled"),
         };
 
         // The C# authority: assert every SQL pair is accepted by OrderService and
@@ -317,15 +384,12 @@ public class DbSupabaseTests
         foreach (var (from, to) in sqlWhitelist)
             Assert.True(Svc.PlanTransition(from, to).IsSuccess, $"OrderService should allow {from}->{to}");
 
-        // Representative illegal pairs (skips / backward / terminal) must be rejected.
+        // Representative illegal pairs (pre-payment skips) must be rejected.
         var illegalSamples = new[]
         {
-            ("pending", "ready"),
-            ("pending", "completed"),
-            ("preparing", "completed"),
-            ("ready", "cancelled"),
-            ("completed", "cancelled"),
-            ("cancelled", "pending"),
+            ("awaiting_payment", "preparing"),
+            ("payment_submitted", "ready"),
+            ("awaiting_payment", "completed"),
         };
         foreach (var (from, to) in illegalSamples)
         {

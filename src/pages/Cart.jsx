@@ -191,7 +191,7 @@ export default function Cart() {
 
             <div className="checkout__pay">
               <Icon name="check" size={18} className="checkout__pay-icon" />
-              <span>Pay cash upon pickup at the counter</span>
+              <span>Pay via GCash next — you'll get the vendor's number after confirming</span>
             </div>
 
             {closed && (
@@ -210,7 +210,8 @@ export default function Cart() {
               {submitting ? 'Placing order…' : 'Confirm Pre-Order'}
             </button>
             <p className="checkout__fine">
-              This reserves your order for pickup only.
+              After confirming, pay via GCash and submit your reference number to
+              send this order to the vendor.
             </p>
           </form>
         </aside>

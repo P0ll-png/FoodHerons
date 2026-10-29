@@ -123,4 +123,37 @@ public class OrderServiceValidationTests
     {
         Assert.Null(_svc.ValidateTransition(new TransitionRequest("preparing", null)));
     }
+
+    // ---- GCash payment transition reason rules ----
+
+    [Fact]
+    public void Reject_payment_without_reason_rejected()
+    {
+        // -> awaiting_payment (vendor/admin rejects the proof) requires a reason.
+        var error = _svc.ValidateTransition(new TransitionRequest("awaiting_payment", null));
+        Assert.NotNull(error);
+        Assert.Equal(422, error!.Status);
+        Assert.Equal("reason", error.Extensions!["field"]);
+    }
+
+    [Fact]
+    public void Reject_payment_with_reason_passes()
+    {
+        Assert.Null(_svc.ValidateTransition(new TransitionRequest("awaiting_payment", "Reference not found")));
+    }
+
+    [Fact]
+    public void Verify_payment_with_reason_rejected()
+    {
+        // The verify move (-> pending) forbids a reason.
+        var error = _svc.ValidateTransition(new TransitionRequest("pending", "ok"));
+        Assert.NotNull(error);
+        Assert.Equal("reason", error!.Extensions!["field"]);
+    }
+
+    [Fact]
+    public void Verify_payment_without_reason_passes()
+    {
+        Assert.Null(_svc.ValidateTransition(new TransitionRequest("pending", null)));
+    }
 }

@@ -39,6 +39,14 @@ public sealed record TransitionRequest(
     string? To,
     string? Reason);
 
+/// <summary>
+/// Request body for POST /api/orders/{id}/payment — the student submits their
+/// GCash reference number and an optional screenshot Storage path.
+/// </summary>
+public sealed record SubmitPaymentRequest(
+    string? GcashReference,
+    string? ScreenshotPath);
+
 /// <summary>200 response for a transition (and the general order view shape).</summary>
 public sealed record OrderDto(
     Guid Id,
@@ -52,4 +60,10 @@ public sealed record OrderDto(
     DateTimeOffset? ReadyAt,
     DateTimeOffset? CompletedAt,
     DateTimeOffset? CancelledAt,
-    string? CancelReason);
+    string? CancelReason,
+    // Read-only payment projections (design §4.4).
+    string? GcashReference,
+    DateTimeOffset? PaymentSubmittedAt,
+    DateTimeOffset? PaymentVerifiedAt,
+    string? PaymentRejectedReason,
+    string? PaymentScreenshotPath);

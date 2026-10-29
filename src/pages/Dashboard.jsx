@@ -1340,16 +1340,113 @@ function AccountTab({ history, openCount, flash, onDeleted }) {
 }
 
 /* ------------------------------------------------------------------ */
+/*  Payments (GCash pre-order verification)                            */
+/* ------------------------------------------------------------------ */
+// payment_submitted orders can be Verified / Rejected / Cancelled; awaiting_payment
+// orders (student hasn't paid yet) can only be Cancelled. All writes go through
+// the C# order service (never a direct Supabase order write).
+function PaymentsTab({ payments, preorder, onTurnOn, onVerify, onReject, onCancel, onView }) {
+  const submitted = payments.filter((o) => o.status === 'payment_submitted')
+  const awaiting = payments.filter((o) => o.status === 'awaiting_payment')
+
+  if (!preorder) {
+    return (
+      <>
+        <PageHead title="Payments" sub="GCash payments show up here when pre-ordering is on." />
+        <div className="dashboard-empty">
+          <span className="dashboard-empty__icon"><Icon name="bellOff" size={34} /></span>
+          <h2>Pre-ordering is off</h2>
+          <p>Your store is listing-only, so there are no GCash pre-orders to verify. Turn it on to start receiving orders.</p>
+          <button type="button" className="dashboard-btn dashboard-btn--primary" onClick={onTurnOn}>Turn on pre-ordering</button>
+        </div>
+      </>
+    )
+  }
+
+  return (
+    <>
+      <PageHead
+        title="Payments"
+        sub={`${submitted.length} ${submitted.length === 1 ? 'payment' : 'payments'} to review. Verify a GCash reference to send the order to your queue.`}
+      />
+
+      <section className="dashboard-panel" aria-label="Payments to verify">
+        <h2 className="dashboard-payments__group">Submitted — needs review</h2>
+        {submitted.length === 0 ? (
+          <div className="dashboard-empty dashboard-empty--small">
+            <h2>No payments waiting</h2>
+            <p>When a student submits their GCash reference, it shows up here for you to verify.</p>
+          </div>
+        ) : (
+          <ul className="dashboard-list">
+            {submitted.map((o) => (
+              <li key={o.uuid} className="dashboard-order dashboard-order--payment">
+                <div className="dashboard-order__main">
+                  <p className="dashboard-order__title">
+                    <span className="dashboard-order__id">{o.id}</span>
+                    <span>{o.name}</span>
+                    <span className="dashboard-badge dashboard-badge--payment_submitted">Payment submitted</span>
+                  </p>
+                  <p className="dashboard-order__items"><ItemList text={o.items} /></p>
+                  <p className="dashboard-payments__ref">
+                    GCash ref: <strong>{o.gcashReference || '—'}</strong>
+                    {' · '}
+                    <button type="button" className="dashboard-link" onClick={() => onView(o.screenshotPath)}>
+                      View screenshot
+                    </button>
+                  </p>
+                </div>
+                <span className="dashboard-order__total"><Peso value={o.total} /></span>
+                <div className="dashboard-order__actions">
+                  <button type="button" className="dashboard-action dashboard-action--reject" onClick={() => onCancel(o.uuid)}>Cancel</button>
+                  <button type="button" className="dashboard-action dashboard-action--reject" onClick={() => onReject(o.uuid)}>Reject</button>
+                  <button type="button" className="dashboard-action dashboard-action--pending" onClick={() => onVerify(o.uuid)}>Verify payment</button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {awaiting.length > 0 && (
+          <>
+            <h2 className="dashboard-payments__group dashboard-payments__group--muted">Awaiting payment</h2>
+            <ul className="dashboard-list">
+              {awaiting.map((o) => (
+                <li key={o.uuid} className="dashboard-order dashboard-order--muted">
+                  <div className="dashboard-order__main">
+                    <p className="dashboard-order__title">
+                      <span className="dashboard-order__id">{o.id}</span>
+                      <span>{o.name}</span>
+                      <span className="dashboard-badge dashboard-badge--awaiting_payment">Awaiting payment</span>
+                    </p>
+                    <p className="dashboard-order__items"><ItemList text={o.items} /></p>
+                  </div>
+                  <span className="dashboard-order__total"><Peso value={o.total} /></span>
+                  <div className="dashboard-order__actions">
+                    <button type="button" className="dashboard-action dashboard-action--reject" onClick={() => onCancel(o.uuid)}>Cancel</button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+      </section>
+    </>
+  )
+}
+
+/* ------------------------------------------------------------------ */
 /*  Top bar (logo, nav pill, bell, avatar menu)                        */
 /* ------------------------------------------------------------------ */
 
 const NAV = [
   { id: 'dashboard', label: 'Dashboard', icon: 'home' },
   { id: 'orders', label: 'Orders', icon: 'cart' },
+  { id: 'payments', label: 'Payments', icon: 'peso' },
   { id: 'menu', label: 'Menu', icon: 'utensils' },
 ]
 
-function TopBar({ tab, onTab, preorder, onPreorder, preorderLock, pendingCount, profile, onExit, onLogout }) {
+function TopBar({ tab, onTab, preorder, onPreorder, preorderLock, pendingCount, submittedCount, profile, onExit, onLogout }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const accountRef = useRef(null)
 
@@ -1367,6 +1464,7 @@ function TopBar({ tab, onTab, preorder, onPreorder, preorderLock, pendingCount, 
   }, [menuOpen])
 
   const newOrders = preorder ? pendingCount : 0
+  const newPayments = preorder ? submittedCount : 0
 
   return (
     <header className="dashboard-top">
@@ -1393,6 +1491,9 @@ function TopBar({ tab, onTab, preorder, onPreorder, preorderLock, pendingCount, 
   <Icon name={n.icon} size={16} />
   {n.id === 'orders' && newOrders > 0 && (
     <span className="dashboard-nav__badge" aria-label={`${newOrders} new`}>{newOrders}</span>
+  )}
+  {n.id === 'payments' && newPayments > 0 && (
+    <span className="dashboard-nav__badge" aria-label={`${newPayments} to verify`}>{newPayments}</span>
   )}
 </span>
 <span className="dashboard-nav__label">{n.label}</span>
@@ -1495,6 +1596,7 @@ export default function Dashboard() {
   const [tab, setTab] = useState('dashboard') // dashboard | orders | menu | profile | settings
   const [orders, setOrders] = useState([]) // active orders (read-only from Supabase)
   const [history, setHistory] = useState([]) // completed/cancelled orders (read-only)
+  const [payments, setPayments] = useState([]) // awaiting_payment + payment_submitted (pre-queue)
   const [rejecting, setRejecting] = useState(null)
   const [toast, setToast] = useState('')
 
@@ -1532,13 +1634,14 @@ export default function Dashboard() {
     if (!currentVendorId) return
     const { data, error } = await supabase
       .from('orders')
-      .select('id, code, pickup_name, status, total, placed_at, cancel_reason, order_items(name, qty)')
+      .select('id, code, pickup_name, status, total, placed_at, cancel_reason, gcash_reference, payment_screenshot_path, order_items(name, qty)')
       .eq('vendor_id', currentVendorId)
       .order('placed_at', { ascending: false })
     if (error) { console.error('Failed to load orders:', error); return }
     const rows = data ?? []
     const live = []
     const done = []
+    const pay = [] // awaiting_payment + payment_submitted (pre-queue, not Incoming)
     rows.forEach((o) => {
       const base = {
         uuid: o.id, // real order UUID — used for status transitions via the order service
@@ -1550,12 +1653,15 @@ export default function Dashboard() {
       }
       if (o.status === 'completed' || o.status === 'cancelled') {
         done.push({ ...base, reason: o.cancel_reason || undefined, daysAgo: daysAgoFrom(o.placed_at), placedAt: Date.parse(o.placed_at) })
+      } else if (o.status === 'awaiting_payment' || o.status === 'payment_submitted') {
+        pay.push({ ...base, gcashReference: o.gcash_reference || undefined, screenshotPath: o.payment_screenshot_path || null, placedAt: Date.parse(o.placed_at) })
       } else {
         live.push({ ...base, placedAt: Date.parse(o.placed_at) })
       }
     })
     setOrders(live)
     setHistory(done)
+    setPayments(pay)
   }, [currentVendorId])
 
   useEffect(() => { loadOrders() }, [loadOrders])
@@ -1627,7 +1733,52 @@ export default function Dashboard() {
     }
   }
 
+  // Open a short-lived signed URL for a payment screenshot in a new tab.
+  const viewScreenshot = async (path) => {
+    if (!path) { flash('No screenshot provided'); return }
+    const { data, error } = await supabase.storage.from('payment-proofs').createSignedUrl(path, 60)
+    if (error || !data?.signedUrl) { flash('Couldn’t open the screenshot.'); return }
+    window.open(data.signedUrl, '_blank', 'noopener,noreferrer')
+  }
+
+  // Payment verify/reject/cancel — all go through the C# order service by the
+  // order UUID, then refresh. Verify has no reason; reject/cancel prompt for one.
+  const runPayment = async (fn, okMsg) => {
+    try {
+      await fn()
+      await loadOrders()
+      flash(okMsg)
+    } catch (err) {
+      flash(
+        err?.code === 'ILLEGAL_TRANSITION'
+          ? 'That order has already moved on — refreshing.'
+          : err?.message || 'Could not update the order. Please try again.'
+      )
+      if (err?.code === 'ILLEGAL_TRANSITION') await loadOrders()
+    }
+  }
+
+  const verifyPayment = (uuid) =>
+    runPayment(() => transitionOrder(uuid, { to: 'pending' }), 'Payment verified — order is now in your queue')
+
+  const rejectPayment = (uuid) => {
+    const reason = window.prompt('Why are you rejecting this payment?')
+    if (reason === null) return
+    const trimmed = reason.trim()
+    if (!trimmed) { flash('Please give a short reason.'); return }
+    return runPayment(() => transitionOrder(uuid, { to: 'awaiting_payment', reason: trimmed }), 'Payment rejected — student can resubmit')
+  }
+
+  const cancelPayment = (uuid) => {
+    const reason = window.prompt('Why are you cancelling this order?')
+    if (reason === null) return
+    const trimmed = reason.trim()
+    if (!trimmed) { flash('Please give a short reason.'); return }
+    return runPayment(() => transitionOrder(uuid, { to: 'cancelled', reason: trimmed }), 'Order cancelled')
+  }
+
   const pendingCount = orders.filter((o) => o.status === 'pending').length
+  const submittedCount = payments.filter((o) => o.status === 'payment_submitted').length
   const openCount = orders.filter((o) => o.status !== 'completed').length // orders still being handled
 
   // No store linked to this account yet: show a message instead of crashing
@@ -1655,6 +1806,7 @@ export default function Dashboard() {
         onPreorder={setPreorder}
         preorderLock={preorderLock}
         pendingCount={pendingCount}
+        submittedCount={submittedCount}
         profile={profile}
         onExit={() => navigate('/')}
         onLogout={() => { auth?.logout?.(); navigate('/login') }}
@@ -1681,6 +1833,10 @@ export default function Dashboard() {
         {tab === 'orders' && (
           <OrdersTab orders={orders} menu={menu} preorder={preorder} onTurnOn={() => setPreorder(true)}
             onStatus={changeStatus} onReject={setRejecting} />
+        )}
+        {tab === 'payments' && (
+          <PaymentsTab payments={payments} preorder={preorder} onTurnOn={() => setPreorder(true)}
+            onVerify={verifyPayment} onReject={rejectPayment} onCancel={cancelPayment} onView={viewScreenshot} />
         )}
         {tab === 'menu' && (
           <MenuTab menu={menu} categories={categories} flash={flash}
