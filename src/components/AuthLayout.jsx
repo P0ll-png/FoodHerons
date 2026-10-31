@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
 import Icon from '../components/Icon'
 import '../pages/auth.css'
@@ -73,6 +74,26 @@ export function FacebookButton({ onClick, label = 'Continue with Facebook' }) {
   )
 }
 
+/* [ADD] "Continue with Google" button. Same look as FacebookButton (reuses the .auth__fb class), plus .auth__google for spacing. */
+// Frontend-only stub: wire `onClick` to Google Login (via the backend) later.
+export function GoogleButton({ onClick, label = 'Continue with Google' }) {
+  return (
+    <button type="button" className="auth__fb auth__google" onClick={onClick}>
+      {/* [CHANGE] Google "G" icon (flat style with shaded segments). viewBox is cropped tight to the G (185 50 320 320)
+          so it fills the full 24px, the same size as the Facebook circle. */}
+      <svg width="24" height="24" viewBox="185 50 320 320" aria-hidden="true" focusable="false">
+        <path fill="#FF4B26" d="M345 50A160 160 0 0 0 207 130L261 161A97 97 0 0 1 345 113Z" />   {/* top-left red */}
+        <path fill="#D93F21" d="M345 50A160 160 0 0 1 452 92L413 139A97 97 0 0 0 345 113Z" />   {/* top-right dark red */}
+        <path fill="#FFD500" d="M207 130A160 160 0 0 0 207 290L261 260A97 97 0 0 1 261 161Z" />  {/* left yellow */}
+        <path fill="#14B54A" d="M207 290A160 160 0 0 0 345 370L345 307A97 97 0 0 1 261 260Z" />  {/* bottom-left green */}
+        <path fill="#0F9D45" d="M345 370A160 160 0 0 0 425 348L395 295A97 97 0 0 1 345 307Z" />  {/* bottom dark green */}
+        <path fill="#1A7FE8" d="M425 348A160 160 0 0 0 505 210L505 195Q505 183 493 183L364 183Q352 183 352 195L352 233Q352 245 364 245L437 245A97 97 0 0 1 395 295Z" />  {/* right blue + bar */}
+      </svg>
+      <span>{label}</span>
+    </button>
+  )
+}
+
 export function AuthTerms() {
   return (
     <p className="auth__terms"> {/* The links are placeholder for now */}
@@ -80,7 +101,69 @@ export function AuthTerms() {
     </p>
   )
 }
+export function AuthToast({ title, text, icon = 'mail', onClose }) {
+  return createPortal(
+    <div className="toast" role="status" aria-live="polite">
+      <Icon name={icon} size={20} />
+      <div className="toast__body">
+        {title && <strong className="toast__title">{title}</strong>}
+        {text && <span className="toast__text">{text}</span>}
+      </div>
+      {onClose && (
+        <button type="button" className="toast__close" aria-label="Dismiss" onClick={onClose}>
+          ×
+        </button>
+      )}
+    </div>,
+    document.body
+  )
+}
+/* ---------- [ADD] "Check your inbox" body: message, resend countdown, go back ---------- */
+const RESEND_COOLDOWN = 60   // seconds. Matches Supabase's 60s resend limit.
 
+export function CheckInbox({ onResend, onChangeEmail }) {
+  const [cooldown, setCooldown] = useState(RESEND_COOLDOWN)   
+  const [status, setStatus] = useState('')                    // '', 'sending', 'sent', 'error'
+
+  // ticks the countdown down once per second
+  useEffect(() => {
+    if (cooldown <= 0) return
+    const t = setTimeout(() => setCooldown((c) => c - 1), 1000)
+    return () => clearTimeout(t)
+  }, [cooldown])
+
+  const resend = async () => {
+    setStatus('sending')
+    try {
+      await onResend()
+      setStatus('sent')
+      setCooldown(RESEND_COOLDOWN)   // restart the countdown after a successful resend
+    } catch {
+      setStatus('error')
+    }
+  }
+
+  return (
+    <div className="inbox" role="status" aria-live="polite">
+      <p className="inbox__text">
+        Open the link in the email to activate your account. Can’t find it? Check your spam folder.
+      </p>
+
+      {/* disabled (faded) while counting down, e.g. "Resend in 42s" */}
+      <button type="button" className="auth__submit inbox__resend"
+        onClick={resend} disabled={cooldown > 0 || status === 'sending'}>
+        {status === 'sending' ? 'Sending…' : cooldown > 0 ? `Resend in ${cooldown}s` : 'Resend email'}
+      </button>
+
+      {status === 'sent' && <p className="inbox__ok">A new link is on its way.</p>}
+      {status === 'error' && <p className="auth__error" role="alert">Couldn’t resend. Please try again.</p>}
+
+      <p className="inbox__wrong">
+        Wrong email address? <button type="button" className="inbox__link" onClick={onChangeEmail}>Go back</button>
+      </p>
+    </div>
+  )
+}
 // value defaults to '' so the rules checklist can't crash on an undefined value
 export function PasswordField({ id = 'password', label = 'Password', placeholder = 'Enter your password', value = '', onChange, autoComplete, showRules = false }) {
   const [show, setShow] = useState(false)

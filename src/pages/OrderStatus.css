@@ -42,11 +42,11 @@
   margin-bottom: var(--space-4);
   transition: background 0.3s, box-shadow 0.3s;
 }
-/* Pending + accepted: darker red with a soft red ring */
-.state-icon--pending,
+/* Accepted: darker red with a soft red ring */
+/* [CHANGE] removed .state-icon--pending (Pending status no longer exists) */
 .state-icon--accepted {
-  background: #a81f12;
-  box-shadow: 0 0 0 8px #fbd9d4;
+  background: var(--orange-dark);
+  box-shadow: 0 0 0 8px #ffd7d2;
 }
 /* Ready + completed: darker green with a soft green ring */
 .state-icon--ready,
@@ -54,10 +54,16 @@
   background: #0d3f22;
   box-shadow: 0 0 0 8px #d1ebdb;
 }
+/* [CHANGE] NEW: canceled */
+.state-icon--cancelled {
+  background: var(--reject);
+  box-shadow: 0 0 0 8px #ffd7d2;
+  font-weight: 500;
+}
 /* Payment: orange with a soft orange ring (no blue) */
 .state-icon--payment {
   background: var(--orange-dark);
-  box-shadow: 0 0 0 8px var(--orange-soft);
+  box-shadow: 0 0 0 8px #ffd7d2;
 }
 
 /* =====================================================
@@ -119,10 +125,12 @@
   flex-shrink: 0;
 }
 
-.status-pill--pending {
-  color: #8a5a00;
-  background: #fdf0c9;
-  border-color: #f1d9a0;
+/* [CHANGE] removed .status-pill--pending (Pending status no longer exists) */
+/* [CHANGE] NEW: canceled pill, grey */
+.status-pill--cancelled {
+  color: var(--reject);
+  background: #ffd7d2;
+  border-color: #d6d6d6;
 }
 .status-pill--accepted {
   color: #2a5ea8;
@@ -385,7 +393,7 @@
 .order-pay {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: 16px;                       /* space between the Send exactly box and the form */
 }
 .order-pay__gcash {
   text-align: center;
@@ -395,15 +403,15 @@
   border: 1px solid var(--orange);
 }
 .order-pay__gcash-label {
-  font-size: var(--fs-in);
-  color: var(--orange-dark);
+  font-size: var(--fs-sm);
+  color: var(--danger);
   font-weight: 600;
 }
 .order-pay__gcash-amount {
   font-size: var(--fs-lg);
   font-weight: 800;
   color: var(--ink);
-  margin: 2px 0;
+  margin: 8px 0;
 }
 .order-pay__gcash-to {
   font-size: var(--fs-sm);
@@ -412,11 +420,39 @@
 .order-pay__gcash-to strong {
   font-variant-numeric: tabular-nums;
 }
+/* Payment form: even spacing between the fields and the buttons.
+   The extra rules below cancel big margins/min-heights that field and
+   button wrappers inherit from the global styles (ui.css). */
 .order-pay__form {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: var(--space-6);                       /* space between: reference field, screenshot field, buttons */
 }
+.order-pay .order-pay__form > * { margin: 0; }          /* no stray margins on direct children */
+.order-pay .order-pay__form [class*="field"],
+.order-pay .order-pay__form [class*="group"] {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;                        /* label sits close to its own input */
+  margin: 0;
+  min-height: 0;
+  padding: 0;
+}
+.order-pay .order-pay__form label {
+  display: block;
+  margin: 0;
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  line-height: 1.3;
+}
+.order-pay .order-pay__form input,
+.order-pay .order-pay__form textarea { margin: 0; }
+.order-pay .order-pay__form [class*="hint"],
+.order-pay .order-pay__form [class*="error"]:empty { margin: 0; min-height: 0; }   /* reserved message space collapses when empty */
+/* Buttons: tighter gap between Submit, Cancel order and Contact Vendor */
+.order-pay .order-pay__form [class*="actions"],
+.order-pay .order-pay__form [class*="btn"] + [class*="btn"] { margin-top: 0; }
+.order-pay .order-pay__form [class*="actions"] { display: flex; flex-direction: column; gap: 10px; }
 .order-pay__rejected,
 .order-pay__notice,
 .order-pay__waiting {
@@ -688,3 +724,338 @@
   margin-right: 0.02em;
   flex: none;
 }
+
+/* ===== Cancel order pop-up =====
+   Styled to match the vendor dashboard's "Reject order" pop-up:
+   rounded modal, two-column reason cards, labelled 2-row note, right-aligned compact buttons. */
+
+/* Dark backdrop that centers the modal */
+.cancel-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(30, 15, 8, 0.5);
+}
+
+/* The modal card */
+.cancel-modal {
+  width: min(500px, 100%);
+  max-height: calc(100dvh - 40px);
+  overflow-y: auto;
+  padding: 22px 24px;
+  border: 1px solid var(--border-strong);
+  border-radius: 28px;
+  background: var(--bg, #fff);
+  color: var(--text);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35);
+}
+
+/* Title + helper text */
+.cancel-modal__title { margin: 6px 0 12px; font-size: var(--fs-base); font-weight: 700; }
+.cancel-modal__text { margin: 0 0 12px; font-size: var(--fs-sm); color: var(--text-muted); }
+
+/* Reason cards: two per row (the lone last card spans the full width) */
+.cancel-reasons { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 0 0 14px; padding: 0; border: 0; }
+.cancel-reason {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 0 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  background: var(--surface, #fff);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+.cancel-reason:last-of-type:nth-of-type(odd) { grid-column: 1 / -1; }
+.cancel-reason input { accent-color: var(--orange-dark); }
+/* Selected reason: orange outline + soft orange fill */
+.cancel-reason.is-active { border-color: var(--orange-dark); background: var(--orange-soft); }
+
+/* Note field: label above a short textarea */
+.cancel-field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+.cancel-field label { font-size: var(--fs-sm); font-weight: 600; }
+.cancel-note {
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 14px;
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  background: var(--surface, #fff);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.85rem;
+  resize: vertical;
+  outline: none;
+}
+.cancel-note:focus { border-color: var(--orange-soft); box-shadow: 0 0 0 1px var(--orange-soft); }
+
+/* Buttons: right-aligned, compact */
+.cancel-btn:not(.cancel-btn--danger) {
+  color: var(--ink);          /* text color */
+  border-color: var(--border-strong);   /* outline color */
+  background: transparent; /* fill color */
+}
+.cancel-modal__actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }
+.cancel-btn { min-height: 38px; padding: 0 18px; font-size: 0.82rem; white-space: nowrap; }
+.cancel-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+/* Solid red "Cancel order" (same red as the vendor's "Reject order") */
+.cancel-btn--danger { background: var(--orange-dark); border: 1px solid var(--orange-dark); color: #fff; }
+.cancel-btn--danger:hover:not(:disabled) { box-shadow: 0 6px 12px rgba(226, 74, 59, 0.3); }
+
+/* Phone: single column of reasons, buttons share the width */
+@media (max-width: 480px) {
+  .cancel-modal { padding: 20px 18px; }
+  .cancel-reasons { grid-template-columns: 1fr; }
+  .cancel-modal__actions .cancel-btn { flex: 1; min-width: 0; }
+}
+
+/* ==========================================================================
+   [CHANGE] NEW: "Write a Review" pop-up (copied from the Reviews tab in Profile.css,
+   renamed os-rv-* so this page does not need Profile.css to be loaded)
+   ========================================================================== */
+.os-rv-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(30, 15, 8, 0.5);
+  animation: os-rv-fade 0.18s ease;
+}
+.os-rv-modal {
+  width: min(500px, 100%);
+  max-height: calc(100dvh - 40px);
+  overflow-y: auto;
+  padding: 22px 24px;
+  border: 1px solid var(--border-strong);
+  border-radius: 28px;
+  background: var(--bg);
+  color: var(--text);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35);
+  animation: os-rv-pop 0.22s ease;
+}
+.os-rv-modal__title {
+  margin: 0 0 16px;
+  font-size: var(--fs-base);
+  font-weight: 700;
+}
+.os-rv-modal__top {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+/* Vendor photo placeholder (orange square, same as Profile) */
+.os-rv-photo {
+  display: block;
+  flex-shrink: 0;
+  width: 72px;
+  height: 72px;
+  border-radius: 16px;
+  background: var(--orange);
+}
+.os-rv-modal__who {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+.os-rv-modal__who h3 {
+  margin: 0;
+  font-size: var(--fs-base);
+  font-weight: 700;
+}
+.os-rv-modal__who p {
+  margin: 0;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--text-muted);
+}
+.os-rv-form {
+  display: grid;
+  gap: 12px;
+}
+.os-rv-stars {
+  display: inline-flex;
+  gap: 2px;
+  color: var(--yellow);
+}
+.os-rv-stars button {
+  background: none;
+  border: 0;
+  padding: 2px;
+  color: inherit;
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+.os-rv-stars button:hover { transform: scale(1.25) rotate(-8deg); }
+.os-rv-stars button:active { transform: scale(0.9); }
+.os-rv-stars svg { display: block; }
+.os-rv-form textarea {
+  width: 100%;
+  min-height: 96px;
+  padding: 12px 14px;
+  font: inherit;
+  font-size: var(--fs-sm);
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid color-mix(in srgb, var(--red-soft) 70%, #fff); /* pink outline like Profile */
+  border-radius: var(--field-radius, 14px);
+  resize: vertical;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.os-rv-form textarea::placeholder { color: var(--text-muted); opacity: 1; }
+.os-rv-form textarea:focus {
+  border-color: var(--orange);
+  outline: none;
+  box-shadow: 0 0 0 3px var(--orange-soft);
+}
+.os-rv-actions {
+  display: flex;
+  justify-content: flex-start;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.os-rv-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  padding: 0 16px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  font: inherit;
+  font-weight: 700;
+  font-size: var(--fs-sm);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: transform 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+}
+.os-rv-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.os-rv-btn--primary {
+  background: var(--orange);
+  color: var(--on-primary, #fff);
+  box-shadow: 0 4px 10px color-mix(in srgb, var(--orange) 35%, transparent);
+}
+.os-rv-btn--primary:hover:not(:disabled) { background: var(--hover, var(--orange-dark)); }
+.os-rv-btn--ghost {
+  background: var(--surface);
+  color: var(--text);
+  border-color: color-mix(in srgb, var(--red-soft) 70%, #fff);
+}
+.os-rv-btn--ghost:hover:not(:disabled) { background: var(--orange-soft); }
+.os-rv-btn:active:not(:disabled) { transform: scale(0.96); }
+@keyframes os-rv-fade { from { opacity: 0; } }
+@keyframes os-rv-pop { from { opacity: 0; transform: translateY(12px) scale(0.98); } }
+@media (prefers-reduced-motion: reduce) {
+  .os-rv-overlay, .os-rv-modal, .os-rv-stars button, .os-rv-btn { animation: none !important; transition: none !important; }
+}
+
+/* [CHANGE] NEW: thank-you pop-up shown after a review is saved */
+.os-rv-thanks {
+  width: min(380px, 100%);
+  display: grid;
+  justify-items: center;
+  text-align: center;
+  gap: 4px;
+}
+.os-rv-thanks__icon {
+  display: inline-grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  margin-bottom: 8px;
+  border-radius: 50%;
+  color: #fff;
+  background: #0d3f22;
+  box-shadow: 0 0 0 8px #d1ebdb;
+}
+.os-rv-thanks .os-rv-modal__title { margin-bottom: 4px; }
+.os-rv-thanks__text {
+  margin: 0 0 16px;
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+}
+
+/* CHANGED: "Contact Vendor" restyled as plain icon + bold text (no border, no fill) */
+.order-btn--contact {
+  gap: 8px;
+  padding: 6px 18px;
+  border: 0;
+  background: transparent;
+  color: var(--orange-dark);
+  font-size: var(--fs-sm); 
+  font-weight: 700;
+  box-shadow: none;
+}
+.order-btn--contact:hover { background: var(--orange-soft); box-shadow: none; }
+.order-btn--contact:active { background: var(--orange-soft); }
+.order-btn--contact:focus-visible { outline: 3px solid var(--orange); outline-offset: 2px; }
+.order-btn__icon { flex: none; width: 20px; height: 20px; }
+/* =====================================================
+   CONTACT VENDOR POP-UP
+   ===================================================== */
+.contact-modal { width: min(380px, 100%); }
+
+/* Round icon at the top: orange phone (has number) or gray info (no number yet) */
+.contact-modal__icon {
+  display: inline-grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  margin-bottom: 8px;
+  border-radius: 50%;
+  color: #fff;
+  background: var(--orange-dark);
+  box-shadow: 0 0 0 8px var(--orange-soft);
+}
+.contact-modal__icon--empty {
+  background: #8a7d75;
+  box-shadow: 0 0 0 8px #efe8e4;
+}
+
+/* The vendor's number, big and easy to read */
+.contact-modal__number {
+  margin: 0 0 16px;
+  font-size: 1.5rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: var(--ink, var(--text));
+  font-variant-numeric: tabular-nums;
+}
+
+/* Buttons stacked and full width (also used by the "no number" version) */
+.contact-modal__actions {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+}
+.contact-modal__actions .os-rv-btn {
+  width: 100%;
+  justify-content: center;
+  text-align: center;
+  text-decoration: none;       
+}
+
+/* Plain text "Close" under the buttons */
+.contact-modal__close {
+  padding: 8px;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  cursor: pointer;
+}
+.contact-modal__close:hover { color: var(--text); text-decoration: underline; }
+.contact-modal__close:focus-visible { outline: 3px solid var(--orange); outline-offset: 2px; border-radius: 8px; }
+
+/* Dark mode: keep the gray "no number" icon readable */
+[data-theme="dark"] .contact-modal__icon--empty { background: #6f6560; box-shadow: 0 0 0 8px #2b2321; }

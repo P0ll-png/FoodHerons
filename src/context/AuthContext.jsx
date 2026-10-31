@@ -58,11 +58,13 @@ export function AuthProvider({ children }) {
       setLoading(false)
     })
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      const profile = await fetchProfile(session)
-      if (!mounted.current) return
-      setUser(profile)
-      setLoading(false)
+   const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setTimeout(async () => {
+        const profile = await fetchProfile(session)
+        if (!mounted.current) return
+        setUser(profile)
+        setLoading(false)
+      }, 0)
     })
 
     return () => {
@@ -83,10 +85,11 @@ export function AuthProvider({ children }) {
   }, [])
 
   const signup = useCallback(async ({ name, email, phone, password, role, store }) => {
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({ //  now also reads `data`
       email,
       password,
       options: {
+        emailRedirectTo: `${window.location.origin}/auth/confirmed`,   // [ADD] where the email link lands
         data: {
           full_name: name,
           role,
@@ -96,8 +99,24 @@ export function AuthProvider({ children }) {
       },
     })
     if (error) throw error
+    // [ADD] with "Confirm email" on, an already-registered email returns a fake user with no identities
+    if (data.user && data.user.identities?.length === 0) {
+      throw new Error('An account with this email already exists. Try logging in.')
+    }
+
+    // [ADD] 'confirmed' = already signed in (confirmation disabled), 'pending' = email sent
+    return { status: data.session ? 'confirmed' : 'pending' }
   }, [])
 
+    // [ADD] used by the Resend button on the "Check your inbox" screen
+  const resendVerification = useCallback(async (email) => {
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email,
+      options: { emailRedirectTo: `${window.location.origin}/auth/confirmed` },
+    })
+    if (error) throw error
+  }, [])
   const updateUser = useCallback(async (patch) => {
     if (!user?.id) throw new Error('Not signed in.')
     const columns = {}
@@ -136,11 +155,11 @@ export function AuthProvider({ children }) {
     throw new Error('Account deletion is not available yet.')
   }, [])
 
+   // added `resendVerification` to both the object and the dependency array
   const value = useMemo(
-    () => ({ user, loading, login, logout, signup, updateUser, changePassword, deleteAccount }),
-    [user, loading, login, logout, signup, updateUser, changePassword, deleteAccount]
+    () => ({ user, loading, login, logout, signup, resendVerification, updateUser, changePassword, deleteAccount }),
+    [user, loading, login, logout, signup, resendVerification, updateUser, changePassword, deleteAccount]
   )
-
   return (
     <AuthContext.Provider value={value}>
       {children}

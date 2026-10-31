@@ -44,7 +44,7 @@ function Stars({ value, onChange, size = 16 }) {
   return (
     <span className="pf-stars" role={onChange ? 'radiogroup' : 'img'} aria-label={`${value} out of 5 stars`}>
       {[1, 2, 3, 4, 5].map((n) => {
-        const icon = <Icon name={n <= value ? 'star' : 'starOutline'} size={size} />
+        const icon = <Icon name={n <= value ? 'starFilled' : 'star'} size={size} />   // [CHANGE] was starSolid / starOutline
         return onChange ? (
           <button key={n} type="button" role="radio" aria-checked={n === value} aria-label={`${n} star${n > 1 ? 's' : ''}`} onClick={() => onChange(n)}>{icon}</button>
         ) : (
@@ -146,6 +146,7 @@ function EditProfile({ user, updateUser, onBack }) {
   const [photoMenu, setPhotoMenu] = useState(false)
   const photoWrap = useRef(null)
   const [fb, setFb] = useState(false) // TODO: read/write the real Facebook link status from your API
+  const [google, setGoogle] = useState(false) // [ADD] TODO: read/write the real Google link status from your API (e.g. Supabase linkIdentity / unlinkIdentity)
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
 
   // Mobile number: fixed +63 prefix, the student types the 10-digit number (saved as "+63 917 123 4567").
@@ -284,16 +285,23 @@ function EditProfile({ user, updateUser, onBack }) {
           <span className="pf-connect__name">Facebook</span>
           <button type="button" className="pf-link" onClick={() => setFb((v) => !v)}>{fb ? 'Disconnect' : 'Connect'}</button>
         </div>
+
+        {/* [ADD] Google: same row layout as Facebook (icon, name, Connect / Disconnect) */}
+        <div className="pf-connect">
+          <span className="pf-connect__icon pf-connect__icon--google"><Icon name="google" size={18} /></span>
+          <span className="pf-connect__name">Google</span>
+          <button type="button" className="pf-link" onClick={() => setGoogle((v) => !v)}>{google ? 'Disconnect' : 'Connect'}</button>
+        </div>
       </section>
     </>
   )
 }
 
 /* ---------- Orders ---------- */
-
-// Pill colours match the OrderStatus page: pending = amber, accepted/preparing = blue, ready/completed = green.
+// [CHANGE] 'Pending' removed; 'Payment submitted' added (same orange as Awaiting payment)
 const STATUS_PILL = {
-  Pending: 'pending',
+  'Awaiting payment': 'payment',
+  'Payment submitted': 'payment',
   Accepted: 'accepted',
   Preparing: 'accepted',
   Ready: 'ready',
@@ -301,7 +309,7 @@ const STATUS_PILL = {
   Completed: 'completed',
 }
 
-function Orders({ active, past, onReorder }) {
+function Orders({ active, past, onReorder, onOpen }) {
   const [tab, setTab] = useState('past')
   const list = tab === 'active' ? active : past
   return (
@@ -322,8 +330,24 @@ function Orders({ active, past, onReorder }) {
           />
         ) : (
           <ul className="pf-list">
-            {list.map((o) => (
-              <li key={o.id} className="pf-row-card pf-order">
+            {list.map((o) => {
+              const isActive = tab === 'active'
+              return (
+                <li
+                  key={o.id}
+                  className="pf-row-card pf-order"
+                  role="link"
+                  tabIndex={0}
+                  style={{ cursor: 'pointer' }}
+                  onClick={() => onOpen(o.uuid)}
+                  onKeyDown={(e) => {
+                    if (e.target !== e.currentTarget) return
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      onOpen(o.uuid)
+                    }
+                  }}
+                >
                 <Photo src={o.image} className="pf-photo--thumb" />
                 <div className="pf-order__main">
                   <h3>{o.vendor}</h3>
@@ -335,10 +359,13 @@ function Orders({ active, past, onReorder }) {
                 <strong className="pf-order__total">₱{o.total}</strong>
                 <div className="pf-order__actions">
                   <span className={`pf-pill pf-pill--${STATUS_PILL[o.status] || 'bad'}`}>{o.status}</span>
-                  <button type="button" className="pf-btn pf-btn--reorder" onClick={() => onReorder(o.vendorId)}>Reorder</button>
+                  {!isActive && (
+                    <button type="button" className="pf-btn pf-btn--reorder" onClick={(e) => { e.stopPropagation(); onReorder(o.vendorId) }}>Reorder</button>
+                  )}
                 </div>
               </li>
-            ))}
+              )
+            })}
           </ul>
         )}
       </div>
@@ -406,9 +433,11 @@ function Modal({ title, onClose, children }) {
   )
 }
 
-function Reviews({ pending, past, onSubmitReview }) {
+function Reviews({ pending, past, onSubmitReview, onUpdateReview }) {
   const [editing, setEditing] = useState(null)
   const [error, setError] = useState('')
+  const [editingPast, setEditingPast] = useState(null)            
+  const editingReview = past.find((r) => r.id === editingPast)      
   const writing = pending.find((p) => p.id === editing) // the order whose "Write a review" popup is open
 
   // Submit a review for a completed order: insert {vendor_id, order_id, rating, text} only.
@@ -419,6 +448,16 @@ function Reviews({ pending, past, onSubmitReview }) {
       setEditing(null)
     } catch (err) {
       setError(err?.message || 'Could not submit your review. Please try again.')
+    }
+  }
+    // [ADD] save changes to an existing review
+  const savePast = async (r, data) => {
+    setError('')
+    try {
+      await onUpdateReview(r, data)
+      setEditingPast(null)
+    } catch (err) {
+      setError(err?.message || 'Could not update your review. Please try again.')
     }
   }
 
@@ -462,6 +501,8 @@ function Reviews({ pending, past, onSubmitReview }) {
                     <h3>{r.vendor}</h3>
                     <span className="pf-review__meta">
                       <span className="pf-muted">{r.date}</span>
+                      {/* [ADD] edit button */}
+                      <button type="button" className="pf-btn pf-btn--outline pf-btn--sm" onClick={() => setEditingPast(r.id)}>Edit</button>
                     </span>
                   </div>
                   <Stars value={r.rating} />
@@ -483,6 +524,19 @@ function Reviews({ pending, past, onSubmitReview }) {
             </div>
           </div>
           <ReviewForm write onSave={(d) => savePending(writing, d)} onCancel={() => setEditing(null)} />
+        </Modal>
+      )}
+      {/* [ADD] Edit Review popup, same layout as "Write a Review" but pre-filled */}
+      {editingReview && (
+        <Modal title="Edit Review" onClose={() => setEditingPast(null)}>
+          <div className="pf-modal__top">
+            <Photo src={editingReview.image} className="pf-photo--thumb pf-photo--modal" />
+            <div className="pf-modal__who">
+              <h3>{editingReview.vendor}</h3>
+              <p>Update your rating or comment.</p>
+            </div>
+          </div>
+          <ReviewForm write initial={editingReview} onSave={(d) => savePast(editingReview, d)} onCancel={() => setEditingPast(null)} />
         </Modal>
       )}
     </>
@@ -689,13 +743,15 @@ function AccountSettings({ onBack, onDeleted, changePassword, deleteAccount }) {
 
 // DB status -> the pill label the Orders list renders (STATUS_PILL keys).
 const DB_STATUS_LABEL = {
-  pending: 'Pending',
+  awaiting_payment: 'Awaiting payment',
+  payment_submitted: 'Payment submitted', // [CHANGE] was missing, so these orders showed a raw DB value
+  // [CHANGE] pending: 'Pending' removed
   preparing: 'Preparing', // the OrderStatus page shows this as "Accepted"
   ready: 'Ready',
   completed: 'Completed',
   cancelled: 'Canceled',
 }
-const ACTIVE_STATUSES = ['pending', 'preparing', 'ready']
+const ACTIVE_STATUSES = ['awaiting_payment','payment_submitted', 'preparing', 'ready']
 
 export default function Profile() {
   const auth = useAuth()
@@ -717,6 +773,8 @@ export default function Profile() {
     let active = true
 
     const vendorLabel = (vid) => getVendor(vid)?.name ?? 'Vendor'
+    // CHANGED: thumbnails now use the store's logo (undefined -> the orange placeholder still shows if the store has no logo)
+    const vendorLogo = (vid) => getVendor(vid)?.logo || undefined
 
     ;(async () => {
       const [ordersRes, favRes, reviewsRes] = await Promise.all([
@@ -726,7 +784,7 @@ export default function Profile() {
           .eq('student_id', userId)
           .order('placed_at', { ascending: false }),
         supabase.from('favorites').select('vendor_id').eq('student_id', userId),
-        supabase.from('reviews').select('id, vendor_id, rating, text, created_at, ordered_summary').eq('student_id', userId),
+        supabase.from('reviews').select('id, order_id, vendor_id, rating, text, created_at, ordered_summary').eq('student_id', userId),
       ])
       if (!active) return
 
@@ -745,7 +803,7 @@ export default function Profile() {
         total: o.total,
         date: o.placed_at ? new Date(o.placed_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '',
         items: (o.order_items ?? []).map((oi) => ({ qty: oi.qty, name: oi.name })),
-        image: undefined,
+        image: vendorLogo(o.vendor_id),
       }))
       setOrders(adapted)
 
@@ -759,7 +817,7 @@ export default function Profile() {
           date: r.created_at ? new Date(r.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '',
           rating: r.rating,
           text: r.text,
-          image: undefined,
+          image: vendorLogo(r.vendor_id), 
         }))
       )
 
@@ -773,7 +831,7 @@ export default function Profile() {
             orderId: o.id,
             vendorId: o.vendor_id,
             vendor: vendorLabel(o.vendor_id),
-            image: undefined,
+            image: vendorLogo(o.vendor_id),
           }))
       )
     })()
@@ -797,14 +855,24 @@ export default function Profile() {
   }
 
   // Insert a review (only {vendor_id, order_id, rating, text}); on success move pending -> past.
+   // Insert a review (only {vendor_id, order_id, rating, text}); on success move pending -> past.
   const submitReview = async (p, { rating, text }) => {
-    const { error } = await supabase
+    const { data, error } = await supabase          
       .from('reviews')
       .insert({ vendor_id: p.vendorId, order_id: p.orderId, rating, text })
+      .select('id')                                 
+      .single()                                     
     if (error) throw error
     const today = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-    setPast((l) => [{ id: `r-${p.orderId}`, vendor: p.vendor, image: p.image, date: today, rating, text }, ...l])
+    setPast((l) => [{ id: data.id, vendor: p.vendor, image: p.image, date: today, rating, text }, ...l])   
     setPending((l) => l.filter((x) => x.id !== p.id))
+  }
+
+  // [ADD] update an existing review's rating and text, then refresh it in local state
+  const updateReview = async (r, { rating, text }) => {
+    const { error } = await supabase.from('reviews').update({ rating, text }).eq('id', r.id)
+    if (error) throw error
+    setPast((l) => l.map((x) => (x.id === r.id ? { ...x, rating, text } : x)))
   }
 
   const view = params.get('view')
@@ -815,9 +883,9 @@ export default function Profile() {
   const views = {
     edit: <EditProfile user={user} updateUser={updateUser} onBack={close} />,
     settings: <AccountSettings onBack={close} onDeleted={leave} changePassword={auth.changePassword} deleteAccount={auth.deleteAccount} />,
-    orders: <Orders active={activeOrders} past={pastOrders} onReorder={(id) => navigate(`/vendor/${id}`)} />,
+    orders: <Orders active={activeOrders} past={pastOrders} onReorder={(id) => navigate(`/vendor/${id}`)} onOpen={(uuid) => navigate(`/order/${uuid}`)}/>,
     favorites: <Favorites items={favorites} onRemove={removeFavorite} />,
-    reviews: <Reviews pending={pending} past={past} onSubmitReview={submitReview} />,
+    reviews: <Reviews pending={pending} past={past} onSubmitReview={submitReview} onUpdateReview={updateReview} />,   // [CHANGE] added onUpdateReview
   }
 
   return (

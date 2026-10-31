@@ -31,6 +31,8 @@
 [data-theme="dark"] .dashboard-head__title { color: var(--text); text-shadow: none; }
 [data-theme="dark"] .dashboard-pill { background: var(--surface); border-color: var(--border-strong); color: var(--text); }
 [data-theme="dark"] .dashboard-pill.is-active { background: var(--orange-dark); border-color: var(--orange-dark); color: #fff; }
+[data-theme="dark"] .pay-group .dashboard-payments__group { background: var(--surface); border-color: var(--border-strong); color: var(--text); }
+[data-theme="dark"] .dashboard-payments__count { background: #f5f5f4; color: #1c1917; }
 [data-theme="dark"] .dashboard-pill__count { background: #f5f5f4; color: #1c1917; }
 [data-theme="dark"] .dashboard-order,
 [data-theme="dark"] .dashboard-item { border-color: rgba(255, 255, 255, 0.12); }
@@ -142,22 +144,6 @@
 .dashboard-nav__item.is-locked { opacity: 0.6; }
 .dashboard-nav__item.is-locked.is-active { opacity: 1; }
 .dashboard-nav__lock { display: inline-flex; }
-
-/* New-order count on the Orders tab */
-.dashboard-nav__badge {
-  min-width: 18px;
-  height: 18px;
-  padding: 0 5px;
-  display: grid;
-  place-items: center;
-  border-radius: 999px;
-  background: var(--dashboard-red);
-  color: #fff;
-  font-size: 0.65rem;
-  font-weight: 800;
-}
-
-.dashboard-nav__item.is-active .dashboard-nav__badge { background: #fff; color: var(--orange-dark); }
 
 /* Right side tools */
 .dashboard-top__tools {
@@ -525,29 +511,128 @@
 .dashboard-badge--completed { background: var(--ready-bg); color: var(--ready-fg); }
 .dashboard-badge--open { background: var(--yellow); color: var(--ink); }
 .dashboard-badge--cancelled { background: #f0e9e5; border: none; color: #78716c; }
-/* GCash pre-order states (orange/yellow, no blue) */
-.dashboard-badge--awaiting_payment { background: var(--yellow); color: var(--ink); }
-.dashboard-badge--payment_submitted { background: var(--orange-soft); color: var(--orange-dark); }
+/* (Payment status badges removed: status is shown by the Payments section headings) */
 
-/* Payments tab group headings + rows */
+/* Payments list (Orders > Payments): group headings + rows */
 .dashboard-payments__group {
+  display: flex;
+  align-items: center;
+  gap: 8px;                         /* space between heading text and its count */
   font-size: var(--fs-sm);
-  font-weight: 800;
+  font-weight: 700;
   margin: var(--space-3) 0 var(--space-2);
 }
-.dashboard-payments__group--muted { color: var(--text-muted); }
-.dashboard-payments__ref {
-  font-size: var(--fs-sm);
-  color: var(--text-muted);
-  margin-top: 4px;
-}
-.dashboard-payments__ref strong {
-  color: var(--text);
+.dashboard-payments__group:first-child { margin-top: 0; }
+.dashboard-payments__group--muted { color: var(--ink); }
+
+/* Count bubble next to "Needs review" and "Awaiting payment" (same as .dashboard-pill__count) */
+.dashboard-payments__count {
+  min-width: 20px;
+  height: 20px;
+  padding: 0 4px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: #1c1917;            /* black bubble */
+  color: #fff;                    /* white number */
+  font-size: var(--fs-xs);
+  font-weight: 800;
+  line-height: 1;
   font-variant-numeric: tabular-nums;
 }
-.dashboard-order--payment { border-left: 3px solid var(--orange); }
-.dashboard-order--muted { opacity: 0.85; }
+/* Remove the old parentheses around the number */
+.dashboard-payments__count::before,
+.dashboard-payments__count::after { content: none; }
 
+/* ---------- Payment groups: "Needs review" and "Awaiting payment" ----------
+   Each group is its own rounded section with generous padding (same look as the
+   Pending / Past Reviews sections), and the cards sit inset inside it. */
+.pay-group {
+  padding: 8px 14px 8px 0;   /* no left padding: headings and cards line up with the left edge of the content above */
+}
+.pay-group + .pay-group { margin-top: 16px; }   /* space between the two sections */
+/* "Needs review" / "Awaiting payment" headings styled like the "Last 7 days" pill */
+.pay-group .dashboard-payments__group {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;                          /* space between the text and the red count badge */
+  min-height: 30px;
+  margin: 0 0 14px;                   /* heading sits tight above its cards */
+  padding: 4px 18px;
+  border: 1px solid #f6bcb9;          /* soft pink outline (same as .dashboard-pill) */
+  border-radius: 999px;
+  background: var(--orange-soft);     /* blush fill */
+  color: var(--ink);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+}
+.pay-group .dashboard-empty--small { margin: 0; }
+
+/* ---------- Payment cards (Orders > Payments) ----------
+   Own layout (not the order-card grid): header / items / footer stacked,
+   so long ids, names and item lists wrap naturally instead of getting squeezed. */
+.pay-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 14px 8px 8px;   
+  border: 1px solid #E7E5E4;
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.08);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.pay-card:hover { transform: translateY(-2px); box-shadow: 0 8px 18px rgba(0, 0, 0, 0.1); }
+.pay-card--muted { background: var(--surface); }   /* waiting cards: same look, just dimmed text below */
+.pay-card--muted .pay-card__who,
+.pay-card--muted .pay-card__total { opacity: 0.8; }
+
+/* Header: id + name (left), total (right), vertically centered */
+.pay-card__head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.pay-card__who { display: flex; align-items: center; flex-wrap: wrap; gap: 2px 10px; min-width: 0; margin: 0; }
+.pay-card__id { white-space: nowrap; font-size: var(--fs-sm); font-weight: 800; letter-spacing: 0.02em; color: var(--text); }
+.pay-card__name { font-size: var(--fs-sm); font-weight: 600; color: var(--text); }
+/* thin divider dot between id and name */
+.pay-card__name::before { content: "·"; margin-right: 10px; color: var(--text-muted); }
+.pay-card__total { flex: none; font-size: 1rem; font-weight: 800; color: var(--text); white-space: nowrap; }
+
+/* CHANGE: top row of a payment card matches the order cards: thumb | info | total */
+.pay-card__row {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 16px;
+}
+.pay-card__row > .dashboard-order__total { font-size: var(--fs-sm); }
+
+/* Items */
+.pay-card__items { margin: 0; font-size: 0.8rem; line-height: 1.5; color: var(--text-muted); }
+
+/* Footer: separated by a dashed line; reference on the left, buttons on the right */
+.pay-card__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  margin: 4px 0 4px 8px;   /* CHANGE: lines up with the text now that the card padding is smaller */
+  padding-top: 12px;
+  border-top: 1px dashed #E7E5E4;
+}
+.pay-card__ref { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 10px; margin: 0; font-size: var(--fs-sm); color: var(--text-muted); }
+.pay-card__ref strong { color: var(--text); font-variant-numeric: tabular-nums; }
+.pay-card__ref-label { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+.pay-card__link { color: var(--orange-dark); font-size: var(--fs-sm); }   /* softer than the red used for danger links */
+.pay-card__note { margin: 0; font-size: var(--fs-sm); color: var(--text-muted); font-style: italic; }
+.pay-card__actions { display: flex; align-items: center; gap: 10px; margin-left: auto; }
+
+/* Phone: footer stacks, buttons share the full width */
+@media (max-width: 640px) {
+  .pay-group { padding: 16px 14px 18px 0; border-radius: 18px; }   /* tighter section padding on phones */
+  .pay-card { padding: 8px 12px 8px 8px; }
+  .pay-card__actions { width: 100%; margin-left: 0; }
+  .pay-card__actions .dashboard-action { flex: 1; min-width: 0; }
+}
 
 /* ---------- Dashboard home ---------- */
 
@@ -779,7 +864,7 @@
 
 .dashboard-action--reject {
   background: var(--surface);
-  border-color: var(--orange);
+  border-color: var(--border-strong);
   color: var(--text);
   font-weight: 600;
 }
@@ -1485,9 +1570,65 @@ input[type="time"].dashboard-input::-webkit-calendar-picker-indicator {
 .dashboard-card__sub { margin: 0 0 14px; font-size: var(--fs-sm); color: var(--text-muted); }
 .dashboard-hint { margin: 0; font-size: 0.7rem; color: var(--text-muted); }
 .dashboard-card--danger { background: rgba(255, 255, 255, 0.55); }
+/* [ADD] Sticky Delete Account card: stays in view under the top bar while the left column scrolls (same offset as the store preview card).
+   Only on wide screens; on small screens the settings stack in one column, so it scrolls normally. */
+@media (min-width: 901px) {
+  /* [FIX] Make the right column as tall as the row (the grid's align-items: start shrank it to just the card,
+     so the sticky card had no room to travel). The card then sticks inside this taller column. */
+  .dashboard-settings__col:last-child { align-self: stretch; }
+  .dashboard-settings .dashboard-card--danger {
+    position: sticky;
+    top: calc(var(--top-h) + 16px);
+  }
+}
 .dashboard-card__title--danger { display: flex; align-items: center; gap: 8px; color: #b42318; }
 .dashboard-bullets { margin: 0 0 14px; padding-left: 18px; display: grid; gap: 6px; font-size: 0.78rem; list-style: disc; }
 .dashboard-bullets li { display: list-item; list-style: disc; }
+/* [CHANGE] Connected accounts: copied from the student profile (.pf-accounts / .pf-connect) so both look identical */
+.dashboard-accounts {
+  --dash-line: color-mix(in srgb, var(--red-soft) 70%, #fff);   /* pink outline, same as the profile's --pf-line */
+  display: grid;
+  gap: 12px;
+  padding: 18px 24px;
+}
+[data-theme='dark'] .dashboard-accounts { --dash-line: var(--border-strong); }
+.dashboard-settings .dashboard-accounts .dashboard-card__title { margin-bottom: 0; }
+.dashboard-connect {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 14px;
+  background: var(--surface);
+  border: 1px solid var(--dash-line);
+  border-radius: 14px;
+}
+.dashboard-connect__icon {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  border-radius: 50%;
+  color: var(--on-primary);
+}
+.dashboard-connect__icon--fb { background: #1877f2; }                                   /* Facebook: blue circle, white "f" */
+.dashboard-connect__icon--google { background: var(--surface); border: 1px solid var(--dash-line); }   /* Google: white circle, pink outline */
+.dashboard-connect__name { flex: 1; font-size: var(--fs-sm); font-weight: 600; }
+.dashboard-connect__link {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  color: var(--bad-fg);
+  text-decoration: underline;
+  cursor: pointer;
+  transition: opacity 0.2s ease, transform 0.15s ease;
+}
+.dashboard-connect__link:hover { transform: translateY(-1px); }
+.dashboard-connect__link:active { transform: scale(0.95); }
+@media (prefers-reduced-motion: reduce) { .dashboard-connect__link { transition: none; } }
 .dashboard-link { padding: 0; border: 0; background: none; font: inherit; font-weight: 700; color: #b42318; text-decoration: underline; cursor: pointer; }
 .dashboard-btn--dangerline { background: var(--surface); color: #b42318; border-color: #c4351f; }
 .dashboard-btn--dangerline:hover:not(:disabled) { background: #fff1ef; }
@@ -1670,74 +1811,15 @@ input[type="time"].dashboard-input::-webkit-calendar-picker-indicator {
   100% { transform: scale(1); }
 }
 
-.dashboard-nav__badge { animation: dashboard-badge-pulse 2.4s ease-in-out infinite; }
-@keyframes dashboard-badge-pulse {
-  0%, 100% { transform: scale(1); }
-  50%      { transform: scale(1.12); }
-}
-
 @media (prefers-reduced-motion: reduce) {
   .dashboard-nav__item, .dashboard-nav__item svg { transition: none; }
-  .dashboard-nav__item.is-active, .dashboard-nav__badge { animation: none; }
+  .dashboard-nav__item.is-active { animation: none; }
   .dashboard-nav__item:active,
   .dashboard-nav__item:hover svg { transform: none; }
 }
 
-/* =--- order count ----*/
-.dashboard-nav__icon {
-  position: relative;
-  display: inline-flex;
-  flex: none;
-}
-.dashboard-nav__icon:has(.dashboard-nav__badge) { margin-right: 8px; }
-
-.dashboard-nav__icon .dashboard-nav__badge {
-  position: absolute;
-  top: -6px;
-  right: -8px;
-  min-width: 13px;
-  height: 13px;
-  padding: 0 3px;
-  font-size: 0.55rem;
-  line-height: 1;
-  box-shadow: 0 0 0 1.5px var(--dashboard-nav-bg-solid, #fffaf6);   /* thin ring that separates it from the icon */
-  pointer-events: none;
-  isolation: isolate;
-  /* pops in, then a soft ring pings outward on a loop */
-  animation: dashboard-badge-pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-.dashboard-nav__icon .dashboard-nav__badge::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background: inherit;
-  opacity: 0;
-  animation: dashboard-badge-ping 2s ease-out 0.6s infinite;
-  z-index: -1;
-}
-/* on the orange selected tab the ring matches the orange */
-.dashboard-nav__item.is-active .dashboard-nav__icon .dashboard-nav__badge {
-  box-shadow: 0 0 0 1.5px var(--orange);
-}
-[data-theme="dark"] .dashboard-nav__icon .dashboard-nav__badge {
-  --dashboard-nav-bg-solid: #2a2420;
-}
-
-@keyframes dashboard-badge-pop {
-  0%   { transform: scale(0); }
-  100% { transform: scale(1); }
-}
-@keyframes dashboard-badge-ping {
-  0%   { transform: scale(1);   opacity: 0.55; }
-  70%  { transform: scale(2.1); opacity: 0; }
-  100% { transform: scale(2.1); opacity: 0; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .dashboard-nav__icon .dashboard-nav__badge,
-  .dashboard-nav__icon .dashboard-nav__badge::after { animation: none; }
-}
+/* Nav icon wrapper (count badges removed) */
+.dashboard-nav__icon { position: relative; display: inline-flex; flex: none; }
 
 /* ---------- Search clear button: icon instead of the browser's native X (added) ---------- */
 .dashboard-search input::-webkit-search-cancel-button,
@@ -1761,3 +1843,45 @@ input[type="time"].dashboard-input::-webkit-calendar-picker-indicator {
 .dashboard-search__clear:hover  { background: var(--orange-soft); color: var(--orange-dark); transform: scale(1.1); }
 .dashboard-search__clear:active { transform: scale(.9); }
 .dashboard-search__clear:focus-visible { outline: 2px solid var(--orange); outline-offset: 1px; }
+
+/* CHANGED: count badge restyled to match the design: a white circle with an orange number,
+   sitting on the top-right of the cart icon. The orange outline keeps it visible on the light
+   (inactive) tab and blends into the orange background on the active tab. Animations added below. */
+.dashboard-nav__badge {
+  position: absolute;
+  top: -9px;
+  left: -11px; /* CHANGED: badge now sits on the LEFT of the cart icon (was right) */
+  right: auto;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  display: grid;
+  place-items: center;
+  border: 1.5px solid var(--surface); 
+  border-radius: 999px;
+  background: var(--danger);
+  color: #fff; 
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  box-sizing: border-box;
+  pointer-events: none;
+  animation:
+    dashboard-badge-pop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both,
+    dashboard-badge-pulse 2s ease-out 0.6s infinite;
+}
+
+@keyframes dashboard-badge-pop {
+  0%   { transform: scale(0); opacity: 0; }
+  60%  { transform: scale(1.3); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+@keyframes dashboard-badge-pulse {
+  0%   { box-shadow: 0 0 0 0 rgba(225, 71, 59, 0.55); }
+  70%  { box-shadow: 0 0 0 7px rgba(225, 71, 59, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(225, 71, 59, 0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dashboard-nav__badge { animation: none; }
+}

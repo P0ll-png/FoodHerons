@@ -1,24 +1,29 @@
-import { useState } from 'react'
+import { useState} from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import Icon from '../components/Icon'
 import AuthLayout, {
   PasswordField,
   PhoneField,
+  CheckInbox,  
   AuthDivider,
   AuthTerms,
   FacebookButton,
+  GoogleButton,   // [ADD]
   isStrongPassword,
   isValidPHMobile,
 } from '../components/AuthLayout'
 
 export default function Signup() {
   const navigate = useNavigate()
-  const { signup } = useAuth()
+  // added `resendVerification` (used by the Resend button)
+  const { signup, resendVerification } = useAuth()
   const [params] = useSearchParams()
   const [role, setRole] = useState(params.get('role') === 'vendor' ? 'vendor' : 'student')
   const [form, setForm] = useState({ name: '', email: '', phone: '', password: '', store: '' })
   const [error, setError] = useState('')
+  const [sentTo, setSentTo] = useState(null)
+  const [submitting, setSubmitting] = useState(false)
 
   const update = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
 
@@ -33,8 +38,9 @@ export default function Signup() {
       return
     }
     setError('')
+        setSubmitting(true)
     try {
-      await signup({
+      const { status } = await signup({
         name: form.name,
         email: form.email,
         phone: form.phone,
@@ -42,15 +48,36 @@ export default function Signup() {
         role,
         store: form.store,
       })
-      navigate(role === 'vendor' ? '/dashboard' : '/')
+      if (status === 'confirmed') {
+        navigate(role === 'vendor' ? '/dashboard' : '/', { replace: true })
+        return
+      }
+      setSentTo(form.email)
     } catch (err) {
       setError(err?.message || 'Unable to create your account. Please try again.')
+    } finally {
+      setSubmitting(false)   
     }
   }
 
-  // Facebook signup is a deferred stub.
-  const signupWithFacebook = () => {}
 
+  const signupWithFacebook = () => {}
+  const signupWithGoogle = () => {}
+    // [ADD] full "Check your inbox" screen, shown after a successful signup
+  if (sentTo) {
+    return (
+      <AuthLayout
+        variant="signup"
+        title="✉️ Check your inbox!"
+        message={<>We’ve sent a verification link to <strong>{sentTo}</strong></>}
+      >
+        <CheckInbox
+          onResend={() => resendVerification(sentTo)}
+          onChangeEmail={() => setSentTo(null)}   // "Go back"
+        />
+      </AuthLayout>
+    )
+  }
   return (
     <AuthLayout
       variant="signup"
@@ -103,12 +130,14 @@ export default function Signup() {
 
         {error && <p className="auth__error" role="alert">{error}</p>}
 
-        <button type="submit" className="auth__submit">
-          {role === 'vendor' ? 'Create store' : 'Sign up'}
-        </button>
+<button type="submit" className="auth__submit" disabled={submitting}>
+  {role === 'vendor' ? 'Create store' : 'Sign up'}
+</button>
 
         <AuthDivider />
         <FacebookButton onClick={signupWithFacebook} label="Continue with Facebook" />
+        {/* [ADD] Continue with Google, right below Facebook */}
+        <GoogleButton onClick={signupWithGoogle} label="Continue with Google" />
         <AuthTerms />
 
         <p className="auth__alt">Already have an account? <Link to="/login">Log in</Link></p>

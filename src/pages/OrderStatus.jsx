@@ -13,9 +13,17 @@ const Peso = ({ value }) => (
   </span>
 )
 
+// CHANGED: converts a stored 24-hour time ("08:00", "17:30", "08:00:00") to 12-hour format ("8:00 AM", "5:30 PM").
+const to12h = (t) => {
+  const m = /^(\d{1,2}):(\d{2})(?::\d{2})?$/.exec(String(t ?? '').trim())
+  if (!m) return t
+  const h = Number(m[1])
+  return `${h % 12 || 12}:${m[2]} ${h >= 12 ? 'PM' : 'AM'}`
+}
+
 const STEPS = [
   { key: 'payment', label: 'Payment', desc: 'Pay via GCash to confirm' },
-  { key: 'pending', label: 'Pending', desc: 'Sent to the vendor' },
+  // [CHANGE] 'Pending' step removed from the tracker (payment -> accepted -> ready -> completed)
   { key: 'accepted', label: 'Accepted', desc: 'Vendor is preparing your order' },
   { key: 'ready', label: 'Ready for pickup', desc: 'Head to the stall' },
   { key: 'completed', label: 'Completed', desc: 'Picked up and paid' },
@@ -46,15 +54,19 @@ const STATE_UI = {
       </>
     ),
   },
-  pending: {
-    tone: 'pending',
-    icon: 'clock',
-    title: 'Waiting for the vendor',
-    pill: 'Pending',
+  // [CHANGE] 'pending' UI state (title, pill, subtitle) removed
+  // [CHANGE] NEW: cancelled state. Before, cancelled orders fell back to the first step and
+  // showed "Payment required / Awaiting payment". icon is null because the header draws a
+  // plain ✕ for it (see the header below), so no new Icon name is needed.
+  cancelled: {
+    tone: 'cancelled',
+    icon: null,
+    title: 'Order canceled',
+    pill: 'Canceled',
     subtitle: (o) => (
       <>
-        Order <strong>{o.id}</strong> at <strong>{o.vendorName}</strong>. We will
-        update you once it is accepted.
+        Order <strong>{o.id}</strong> at <strong>{o.vendorName}</strong> was
+        canceled.
       </>
     ),
   },
@@ -101,30 +113,103 @@ const STATE_UI = {
 const DB_STATUS_TO_STEP = {
   awaiting_payment: 'payment',
   payment_submitted: 'payment',
-  pending: 'pending',
+  // [CHANGE] was 'pending'. There is no Pending step any more, so a legacy DB 'pending'
+  // order is shown as 'accepted' (same as Profile.jsx, which also dropped Pending).
+  pending: 'accepted',
   preparing: 'accepted',
   ready: 'ready',
   completed: 'completed',
 }
 
-// Small rating + comment form shown on the completed state.
-function ReviewForm({ onSubmit }) {
-  const [rating, setRating] = useState(0)
-  const [text, setText] = useState('')
+// NEW: reasons offered in the cancel pop-up
+const CANCEL_REASONS = ['Changed my mind', 'Ordered by mistake', 'Wrong items or details', 'Taking too long', 'Other']
+
+// NEW: pop-up that asks the student why they are cancelling
+function CancelDialog({ busy, error, onClose, onConfirm }) {
+  const [reason, setReason] = useState(CANCEL_REASONS[0])
+  const [note, setNote] = useState('')
+  const isOther = reason === 'Other'
+
+  // Close with Escape (not while the request is running)
+  useEffect(() => {
+    const onKey = (e) => e.key === 'Escape' && !busy && onClose()
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [busy, onClose])
+
+  const submit = (e) => {
+    e.preventDefault()
+    // "Other" needs typed text; other reasons can add an optional note
+    const text = isOther ? note.trim() : [reason, note.trim()].filter(Boolean).join(' — ')
+    if (text) onConfirm(text)
+  }
+
+  return (
+    <div className="cancel-overlay" onMouseDown={(e) => e.target === e.currentTarget && !busy && onClose()}>
+      <form className="cancel-modal" role="dialog" aria-modal="true" aria-labelledby="cancel-title" onSubmit={submit}>
+        <h2 id="cancel-title" className="cancel-modal__title">Cancel this order?</h2>
+        <p className="cancel-modal__text">Tell us why you are cancelling. The vendor will see your reason.</p>
+
+        <fieldset className="cancel-reasons">
+          <legend className="visually-hidden">Reason for cancelling</legend>
+          {CANCEL_REASONS.map((r) => (
+            <label key={r} className={`cancel-reason ${reason === r ? 'is-active' : ''}`}>
+              <input type="radio" name="cancel-reason" checked={reason === r} onChange={() => setReason(r)} />
+              {r}
+            </label>
+          ))}
+        </fieldset>
+
+        {/* Note: labelled field + short 2-row box (same layout as the vendor's reject pop-up) */}
+        <div className="cancel-field">
+          <label htmlFor="cancel-note">{isOther ? 'Tell us why (required)' : 'Note to vendor (optional)'}</label>
+          <textarea id="cancel-note" className="cancel-note" rows={2} value={note} maxLength={200}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder={isOther ? 'Please tell us why you are cancelling.' : 'Anything the vendor should know?'} />
+        </div>
+
+        {error && <p className="order-review__error" role="alert">{error}</p>}
+
+        {/* Buttons: right-aligned like the reject pop-up. Outline "Keep order" + solid red "Cancel order" */}
+        <div className="cancel-modal__actions">
+          <button type="button" className="order-btn order-btn--outline cancel-btn" onClick={onClose} disabled={busy}>Keep order</button>
+          <button type="submit" className="order-btn cancel-btn cancel-btn--danger" disabled={busy || (isOther && !note.trim())}>
+            {busy ? 'Cancelling…' : 'Cancel order'}
+          </button>
+        </div>
+      </form>
+    </div>
+  )
+}
+
+// [CHANGE] The inline ReviewForm was replaced by this pop-up. It copies the "Write a Review"
+// pop-up from the Reviews tab in Profile (same layout: vendor photo + "How was ...?" +
+// "Order ... is ready to rate.", 5 outline stars, textarea, Save Review / Cancel).
+// It uses its own os-rv-* classes (see OrderStatus.css) so it does not depend on Profile.css.
+// [CHANGE] now also works as the "Edit Review" pop-up: pass `initial` ({ rating, text }) to pre-fill it
+// (same as the Edit Review pop-up in Profile).
+function ReviewDialog({ vendorName, orderCode, initial, onClose, onSubmit }) {
+  const isEdit = !!initial
+  const [rating, setRating] = useState(initial?.rating || 0)
+  const [text, setText] = useState(initial?.text || '')
   const [busy, setBusy] = useState(false)
-  const [done, setDone] = useState(false)
   const [error, setError] = useState('')
 
-  if (done) return <p className="order-review__done" role="status">Thanks for your review!</p>
+  // Close with Escape (not while the review is being saved)
+  useEffect(() => {
+    const onKey = (e) => e.key === 'Escape' && !busy && onClose()
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [busy, onClose])
 
   const submit = async (e) => {
     e.preventDefault()
-    if (!rating) return setError('Pick a star rating first.')
+    if (!rating || busy) return // Save Review stays disabled until a star is picked
     setBusy(true)
     setError('')
     try {
       await onSubmit({ rating, text: text.trim() })
-      setDone(true)
+      // the parent closes the pop-up on success
     } catch (err) {
       setError(err?.message || 'Could not submit your review. Please try again.')
       setBusy(false)
@@ -132,22 +217,128 @@ function ReviewForm({ onSubmit }) {
   }
 
   return (
-    <form className="order-review" onSubmit={submit}>
-      <span className="order-review__stars" role="radiogroup" aria-label={`${rating} out of 5 stars`}>
-        {[1, 2, 3, 4, 5].map((n) => (
-          <button key={n} type="button" role="radio" aria-checked={n === rating}
-            aria-label={`${n} star${n > 1 ? 's' : ''}`} onClick={() => setRating(n)}>
-            <Icon name={n <= rating ? 'star' : 'starOutline'} size={22} />
-          </button>
-        ))}
-      </span>
-      <textarea rows={3} value={text} onChange={(e) => setText(e.target.value)}
-        placeholder="How was the food and pickup? (optional)" maxLength={280} />
-      {error && <p className="order-review__error" role="alert">{error}</p>}
-      <button type="submit" className="order-btn order-btn--primary" disabled={busy}>
-        {busy ? 'Submitting…' : 'Submit review'}
-      </button>
-    </form>
+    <div className="os-rv-overlay" onMouseDown={(e) => e.target === e.currentTarget && !busy && onClose()}>
+      <div className="os-rv-modal" role="dialog" aria-modal="true" aria-labelledby="os-rv-title">
+        <h2 id="os-rv-title" className="os-rv-modal__title">{isEdit ? 'Edit Review' : 'Write a Review'}</h2>
+        <div className="os-rv-modal__top">
+          <span className="os-rv-photo" aria-hidden="true" />
+          <div className="os-rv-modal__who">
+            {/* [CHANGE] edit mode uses the same wording as the Edit Review pop-up in Profile */}
+            <h3>{isEdit ? vendorName : `How was ${vendorName}?`}</h3>
+            <p>{isEdit ? 'Update your rating or comment.' : `Order ${orderCode} is ready to rate.`}</p>
+          </div>
+        </div>
+
+        <form className="os-rv-form" onSubmit={submit}>
+          <span className="os-rv-stars" role="radiogroup" aria-label={`${rating} out of 5 stars`}>
+            {[1, 2, 3, 4, 5].map((n) => (
+              <button key={n} type="button" role="radio" aria-checked={n === rating}
+                aria-label={`${n} star${n > 1 ? 's' : ''}`} onClick={() => setRating(n)}>
+                {/* same icon names as the Profile reviews tab: star = outline, starFilled = filled */}
+                <Icon name={n <= rating ? 'starFilled' : 'star'} size={20} />
+              </button>
+            ))}
+          </span>
+          <textarea rows={4} value={text} onChange={(e) => setText(e.target.value)}
+            placeholder="How was the food and pickup? (optional)" maxLength={280} />
+          {error && <p className="order-review__error" role="alert">{error}</p>}
+          <div className="os-rv-actions">
+            <button type="submit" className="os-rv-btn os-rv-btn--primary" disabled={!rating || busy}>
+              {busy ? 'Saving…' : 'Save Review'}
+            </button>
+            <button type="button" className="os-rv-btn os-rv-btn--ghost" onClick={onClose} disabled={busy}>Cancel</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+// [CHANGE] NEW: small pop-up shown right after a review is saved (or updated)
+function ThanksDialog({ title, text, onClose }) {
+  useEffect(() => {
+    const onKey = (e) => e.key === 'Escape' && onClose()
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+
+  return (
+    <div className="os-rv-overlay" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="os-rv-modal os-rv-thanks" role="dialog" aria-modal="true" aria-labelledby="os-thanks-title">
+        <span className="os-rv-thanks__icon" aria-hidden="true"><Icon name="check" size={26} /></span>
+        <h2 id="os-thanks-title" className="os-rv-modal__title">{title}</h2>
+        <p className="os-rv-thanks__text">{text}</p>
+        <button type="button" className="os-rv-btn os-rv-btn--primary" onClick={onClose} autoFocus>Done</button>
+      </div>
+    </div>
+  )
+}
+
+// NEW: Contact Vendor pop-up.
+// - Vendor HAS a number: shows it large, with Call (opens the phone dialer) and Copy number buttons.
+function ContactDialog({ vendorName, phone, orderId, onClose }) {
+  const [copied, setCopied] = useState(false)
+  const hasPhone = Boolean(phone && phone.trim())
+
+  // Close with Escape
+  useEffect(() => {
+    const onKey = (e) => e.key === 'Escape' && onClose()
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+
+  // Copy the number to the clipboard and show "Copied!" for a moment
+  const copyNumber = async () => {
+    try {
+      await navigator.clipboard.writeText(phone.trim())
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1800)
+    } catch {
+      /* clipboard blocked: the number is still shown on screen, so the student can copy it by hand */
+    }
+  }
+
+  return (
+    <div className="os-rv-overlay" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="os-rv-modal os-rv-thanks contact-modal" role="dialog" aria-modal="true" aria-labelledby="contact-title">
+        {/* Icon circle: orange phone when there is a number, gray info icon when there is not */}
+        <span className={`contact-modal__icon ${hasPhone ? '' : 'contact-modal__icon--empty'}`} aria-hidden="true">
+          {hasPhone ? (
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2Z" />
+            </svg>
+          ) : (
+            <Icon name="info" size={26} />
+          )}
+        </span>
+
+        {hasPhone ? (
+          <>
+            <h2 id="contact-title" className="os-rv-modal__title">Contact {vendorName}</h2>
+            <p className="os-rv-thanks__text">Call or message about order <strong>{orderId}</strong>.</p>
+            <p className="contact-modal__number">{phone.trim()}</p>
+            <div className="contact-modal__actions">
+              <a className="os-rv-btn os-rv-btn--primary" href={`tel:${phone.replace(/\s/g, '')}`}>Call now</a>
+              <button type="button" className="os-rv-btn os-rv-btn--ghost" onClick={copyNumber}>
+                {copied ? 'Copied!' : 'Copy number'}
+              </button>
+              <button type="button" className="contact-modal__close" onClick={onClose} autoFocus>Close</button>
+            </div>
+          </>
+        ) : (
+          <>
+            <h2 id="contact-title" className="os-rv-modal__title">No contact number yet</h2>
+            <p className="os-rv-thanks__text">
+              {vendorName} has not added a contact number. You can still follow your order on this page,
+              or visit the stall and show your order number <strong>{orderId}</strong>.
+            </p>
+            <div className="contact-modal__actions">
+              <button type="button" className="os-rv-btn os-rv-btn--primary" onClick={onClose} autoFocus>Got it</button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
   )
 }
 
@@ -252,7 +443,7 @@ function PaymentForm({ order, vendor, onSubmitted }) {
         {error && <p className="order-review__error" role="alert">{error}</p>}
 
         <button type="submit" className="order-btn order-btn--primary order-btn--block" disabled={busy}>
-          {busy ? 'Submitting…' : 'I’ve paid — submit reference'}
+          {busy ? 'Submitting…' : 'Submit Payment Details'}
         </button>
       </form>
     </div>
@@ -264,9 +455,15 @@ export default function OrderStatus() {
   const { getVendor } = useVendors()
   const [order, setOrder] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [showReview, setShowReview] = useState(false)
+  const [showReview, setShowReview] = useState(false) // [CHANGE] now controls the review pop-up
+  // [CHANGE] replaces `reviewed`: this order's saved review ({ id, rating, text }) or null.
+  // While it is set, the button reads "Edit review" instead of "Leave a review".
+  const [review, setReview] = useState(null)
+  const [thanks, setThanks] = useState(null) // [CHANGE] NEW: text for the thank-you pop-up (null = closed)
   const [cancelling, setCancelling] = useState(false)
   const [cancelError, setCancelError] = useState('')
+  const [showCancel, setShowCancel] = useState(false) 
+  const [showContact, setShowContact] = useState(false) 
 
   // Load the real order (RLS lets a student read only their own orders).
   // Status is always read straight from Supabase — only the write (cancel)
@@ -304,23 +501,32 @@ export default function OrderStatus() {
     return () => { active = false }
   }, [fetchOrder])
 
-  // Student cancel: prompt for a reason, POST the transition through the order
-  // service, then refresh the order from Supabase. ILLEGAL_TRANSITION means the
-  // vendor already moved the order on (lost race).
-  const cancelOrder = async () => {
-    const reason = window.prompt('Why are you cancelling this order?')
-    if (reason === null) return // dismissed the prompt
-    const trimmed = reason.trim()
-    if (!trimmed) {
-      setCancelError('Please give a short reason for cancelling.')
-      return
-    }
+  // [CHANGE] NEW: load this order's existing review (if any), so "Edit review" also shows after a
+  const orderUuid = order?.uuid
+  const orderStatus = order?.status
+  useEffect(() => {
+    if (!orderUuid || orderStatus !== 'completed') return
+    let active = true
+    supabase
+      .from('reviews')
+      .select('id, rating, text')
+      .eq('order_id', orderUuid)
+      .maybeSingle()
+      .then(({ data }) => { if (active) setReview(data ?? null) })
+    return () => { active = false }
+  }, [orderUuid, orderStatus])
+
+  // Student cancel: the reason comes from CancelDialog (no more window.prompt).
+  // POST the transition through the order service, then refresh the order from
+  // Supabase. ILLEGAL_TRANSITION means the vendor already moved the order on.
+  const cancelOrder = async (reason) => {
     setCancelling(true)
     setCancelError('')
     try {
-      await transitionOrder(order.uuid, { to: 'cancelled', reason: trimmed })
+      await transitionOrder(order.uuid, { to: 'cancelled', reason })
       const refreshed = await fetchOrder()
       if (refreshed) setOrder(refreshed)
+      setShowCancel(false) // close the pop-up on success
     } catch (err) {
       setCancelError(
         err?.code === 'ILLEGAL_TRANSITION'
@@ -357,19 +563,23 @@ export default function OrderStatus() {
 
   /* ---------- Derived values ---------- */
   // A cancelled order has no tracker step; show it as payment-looking but blocked.
-  const stepKey = DB_STATUS_TO_STEP[order.status] ?? 'pending'
+  const stepKey = DB_STATUS_TO_STEP[order.status] ?? 'payment'
   const stepIndex = Math.max(0, STEPS.findIndex((s) => s.key === stepKey))
   const current = STEPS[stepIndex]
   const isAwaitingPayment = order.status === 'awaiting_payment'
   const isPaymentSubmitted = order.status === 'payment_submitted'
+  const isCancelled = order.status === 'cancelled' // [CHANGE] NEW
   // In the payment step, the two DB states map to distinct copy; elsewhere the
   // UI is keyed off the tracker step.
-  const ui = isAwaitingPayment
+  // [CHANGE] cancelled is checked first so it never shows a payment/tracker state
+  const ui = isCancelled
+    ? STATE_UI.cancelled
+    : isAwaitingPayment
     ? STATE_UI.payment
     : isPaymentSubmitted
     ? STATE_UI.payment_submitted
     : STATE_UI[current.key]
-  const isPending = current.key === 'pending'
+  // [CHANGE] isPending removed (no Pending step)
   const isCompleted = current.key === 'completed'
 
   // Vendor record gives us location + hours. PINNED: full-list getVendor, so an
@@ -381,22 +591,28 @@ export default function OrderStatus() {
   // Reorder goes back to the vendor's store.
   const reorderTo = vendor ? `/vendor/${vendor.id}` : '/'
 
-  // Submit a review for this completed order. The client sends ONLY these four fields;
-  // student_id/author_name/ordered_summary are filled by the DB trigger.
+  // Save the review for this completed order.
+  // [CHANGE] If a review already exists it is UPDATED (rating + text only); otherwise a new one is
+  // inserted. The client sends ONLY these four fields on insert; student_id/author_name/ordered_summary
+  // are filled by the DB trigger.
   const submitReview = async ({ rating, text }) => {
-    const { error } = await supabase
+    if (review) {
+      const { error } = await supabase.from('reviews').update({ rating, text }).eq('id', review.id)
+      if (error) throw error
+      setReview({ ...review, rating, text })
+      return
+    }
+    const { data, error } = await supabase
       .from('reviews')
       .insert({ vendor_id: order.vendorId, order_id: order.uuid, rating, text })
+      .select('id')
+      .single()
     if (error) throw error
+    setReview({ id: data.id, rating, text })
   }
 
-  const handleContact = () => {
-    if (vendor?.phone) {
-      window.location.href = `tel:${vendor.phone.replace(/\s/g, '')}`
-    } else {
-      window.alert('This vendor has not added a contact number yet.')
-    }
-  }
+  // Contact Vendor now opens a pop-up (shows the number, or a "no number yet" message)
+  const handleContact = () => setShowContact(true)
 
   return (
     <div className="order-page">
@@ -404,7 +620,8 @@ export default function OrderStatus() {
         {/* ---------- Header: icon + title + subtitle ---------- */}
         <header className="order-confirm">
           <span className={`state-icon state-icon--${ui.tone}`} aria-hidden="true">
-            <Icon name={ui.icon} size={26} /> 
+            {/* [CHANGE] cancelled has no icon name, so draw a ✕ instead */}
+            {ui.icon ? <Icon name={ui.icon} size={26} /> : <span style={{ fontSize: 24, lineHeight: 1 }}>✕</span>}
           </span>
           <h1>{ui.title}</h1>
           <p className="order-confirm__sub">{ui.subtitle(orderForUi)}</p>
@@ -420,7 +637,16 @@ export default function OrderStatus() {
             </span>
           </div>
 
+          {/* [CHANGE] A canceled order has no progress to track, so show a short message
+              instead of the tracker */}
+          {isCancelled && (
+            <p className="text-muted" role="status">
+              This order was canceled, so there is nothing left to track.
+            </p>
+          )}
+
           {/* Tracker*/}
+          {!isCancelled && (
           <ol className="tracker">
             {STEPS.map((step, i) => {
               const state =
@@ -455,6 +681,7 @@ export default function OrderStatus() {
               )
             })}
           </ol>
+          )}
         </section>
 
         <div className="order-grid">
@@ -472,7 +699,7 @@ export default function OrderStatus() {
               {vendor?.hoursOpen && vendor?.hoursClose && (
                 <li>
                   <Icon name="clock" size={16} />
-                  <span>Open {vendor.hoursOpen} to {vendor.hoursClose}</span>
+                  <span>Open {to12h(vendor.hoursOpen)} to {to12h(vendor.hoursClose)}</span> {/* CHANGED: 12-hour format */}
                 </li>
               )}
               {order.pickupName && (
@@ -512,8 +739,9 @@ export default function OrderStatus() {
               <strong className="order-receipt__total-amt"><Peso value={order.total} /></strong>
             </div>
 
-            {/* Actions: Payment = pay form / waiting + Cancel, Pending = Cancel,
-                Accepted/Ready = Contact, Completed = Reorder + Review */}
+            {/* Actions: Payment = pay form / waiting + Cancel,
+                Accepted/Ready = Contact, Completed = Reorder + Review
+                [CHANGE] removed 'Pending = Cancel' */}
             <div className="order-actions">
               {isAwaitingPayment && (
                 <>
@@ -535,14 +763,10 @@ export default function OrderStatus() {
                   <button
                     type="button"
                     className="order-btn order-btn--outline order-btn--block"
-                    onClick={cancelOrder}
-                    disabled={cancelling}
+                    onClick={() => setShowCancel(true)} // opens the reason pop-up
                   >
-                    {cancelling ? 'Cancelling…' : 'Cancel order'}
+                    Cancel order
                   </button>
-                  {cancelError && (
-                    <p className="order-review__error" role="alert">{cancelError}</p>
-                  )}
                 </>
               )}
 
@@ -555,41 +779,44 @@ export default function OrderStatus() {
                   <button
                     type="button"
                     className="order-btn order-btn--outline order-btn--block"
-                    onClick={cancelOrder}
-                    disabled={cancelling}
+                    onClick={() => setShowCancel(true)} // opens the reason pop-up
                   >
-                    {cancelling ? 'Cancelling…' : 'Cancel order'}
+                    Cancel order
                   </button>
-                  {cancelError && (
-                    <p className="order-review__error" role="alert">{cancelError}</p>
-                  )}
                 </>
               )}
 
-              {isPending && (
-                <>
-                  <button
-                    type="button"
-                    className="order-btn order-btn--outline order-btn--block"
-                    onClick={cancelOrder}
-                    disabled={cancelling}
-                  >
-                    {cancelling ? 'Cancelling…' : 'Cancel order'}
-                  </button>
-                  {cancelError && (
-                    <p className="order-review__error" role="alert">{cancelError}</p>
-                  )}
-                </>
-              )}
+              {/* [CHANGE] Pending-state Cancel button block removed */}
 
-              {!isPending && !isCompleted && (
+              {/* [CHANGE] condition was `!isPending && !isCompleted`; isPending no longer exists.
+                  Also hidden for canceled orders (nothing to contact the vendor about) */}
+              {!isCompleted && !isCancelled && (
                 <button
                   type="button"
-                  className="order-btn order-btn--outline order-btn--block"
+                  className="order-btn order-btn--contact order-btn--block" /* CHANGED: new plain icon + text style (was order-btn--outline) */
                   onClick={handleContact}
                 >
-                  Contact vendor
+                  {/* CHANGED: chat-bubble icon before the label */}
+                  <svg className="order-btn__icon" width="20" height="20" style={{ display: 'block', flex: 'none' }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M12 3C6.98 3 3 6.58 3 11c0 2.1.9 4 2.4 5.4L4.5 21l4.3-2.1c1 .3 2.1.4 3.2.4 5.02 0 9-3.58 9-8s-3.98-8-9-8z" />
+                    <circle cx="8.5" cy="11" r="1.1" fill="currentColor" />
+                    <circle cx="12" cy="11" r="1.1" fill="currentColor" />
+                    <circle cx="15.5" cy="11" r="1.1" fill="currentColor" />
+                  </svg>
+                  Contact Vendor
                 </button>
+              )}
+
+              {/* [CHANGE] NEW: canceled orders get Reorder + a link back to browsing */}
+              {isCancelled && (
+                <>
+                  <Link to={reorderTo} className="order-btn order-btn--primary order-btn--block">
+                    Reorder
+                  </Link>
+                  <Link to="/" className="order-another">
+                    Order from another vendor
+                  </Link>
+                </>
               )}
 
               {isCompleted && (
@@ -598,17 +825,16 @@ export default function OrderStatus() {
                     <Link to={reorderTo} className="order-btn order-btn--primary">
                       Reorder
                     </Link>
-                    {!showReview && (
-                      <button
-                        type="button"
-                        className="order-btn order-btn--outline"
-                        onClick={() => setShowReview(true)}
-                      >
-                        Leave a review
-                      </button>
-                    )}
+                    {/* [CHANGE] no longer hidden after reviewing: it becomes "Edit review" */}
+                    <button
+                      type="button"
+                      className="order-btn order-btn--outline"
+                      onClick={() => setShowReview(true)}
+                    >
+                      {review ? 'Edit review' : 'Leave a review'}
+                    </button>
                   </div>
-                  {showReview && <ReviewForm onSubmit={submitReview} />}
+                  {/* [CHANGE] inline "Thanks for your review!" text removed; a thank-you pop-up is used instead */}
                   <Link to="/" className="order-another">
                     Order from another vendor
                   </Link>
@@ -618,6 +844,48 @@ export default function OrderStatus() {
           </section>
         </div>
       </div>
+
+      {/* [CHANGE] NEW: "Write a Review" pop-up (same as the Reviews tab in Profile) */}
+      {showReview && (
+        <ReviewDialog
+          vendorName={vendorName}
+          orderCode={order.id}
+          initial={review} // [CHANGE] pre-fills the pop-up when editing
+          onClose={() => setShowReview(false)}
+          onSubmit={async (data) => {
+            const wasEdit = !!review
+            await submitReview(data)
+            setShowReview(false)
+            // [CHANGE] open the thank-you pop-up after saving
+            setThanks(wasEdit
+              ? { title: 'Review updated', text: 'Your changes have been saved.' }
+              : { title: 'Thank you!', text: 'Thanks for your review. It helps other students pick where to eat.' })
+          }}
+        />
+      )}
+
+      {/* [CHANGE] NEW: thank-you pop-up */}
+      {thanks && <ThanksDialog title={thanks.title} text={thanks.text} onClose={() => setThanks(null)} />}
+
+      {/* NEW: Contact Vendor pop-up */}
+      {showContact && (
+        <ContactDialog
+          vendorName={vendorName}
+          phone={vendor?.phone}
+          orderId={order.id}
+          onClose={() => setShowContact(false)}
+        />
+      )}
+
+      {/* NEW: cancel reason pop-up */}
+      {showCancel && (
+        <CancelDialog
+          busy={cancelling}
+          error={cancelError}
+          onClose={() => { setShowCancel(false); setCancelError('') }}
+          onConfirm={cancelOrder}
+        />
+      )}
     </div>
   )
 }

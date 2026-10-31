@@ -1,12 +1,10 @@
 import { Link } from 'react-router-dom'
 import HeronMascot from './HeronMascot'
-import WaveDivider from './WaveDivider'
 import './Footer.css'
 
 export default function Footer() {
   return (
     <footer className="footer">
-      <WaveDivider className="footer__wave" />
       <div className="container footer__grid">
         <div className="footer__brand">
           <div className = "footer__brand-top">
@@ -36,14 +34,14 @@ export default function Footer() {
           <h3>Explore</h3>
           <Link to="/">Open Now </Link>
           <Link to="/">View Map</Link>
-          <Link to="/">About us</Link>
+          <Link to="/about">About us</Link>
         </nav>
 
         <nav className="footer__col" aria-label="For vendors">
           <h3>For vendors</h3>
           <Link to="/signup?role=vendor">Become a vendor</Link>
           <Link to="/login">Log in</Link>
-          <Link to="/">Partner FAQs</Link>
+          <Link to="/about?faq=vendors#faqs">Partner FAQs</Link>
         </nav>
 
         <div className="footer__col"> 

@@ -1,0 +1,498 @@
+.about {
+  --about-orange: var(--orange, #EC6A2A);
+  --about-orange-dark: #C2410C;   /* darker orange: white text on it passes contrast */
+  --about-red: #E0463C;           /* dotted line + accents */
+  --about-red-text: #B3261E;      /* red used for small text */
+  --about-blush: #FDE4E0;         /* pill backgrounds */
+  --about-ink: #3A2A22;           /* espresso text */
+  --about-warm: #F7F2EF;          /* warm gray section background */
+  color: var(--about-ink);
+  font-family: inherit;
+}
+
+/* ---- Shared: section headings ---- */
+.about-title {
+  margin: 0 0 1rem;
+  font-size: var(--fs-xl);
+  font-weight: 600;
+  line-height: 1.1;
+}
+.about-title--center { text-align: center; margin-bottom: 2.25rem; }
+
+/* ---- Shared: pill tag ---- */
+.about-tag {
+  display: inline-block;
+  padding: 0.4rem 1rem;
+  border-radius: 999px;
+  background: var(--orange-soft);
+  color: var(--danger);
+  font-weight: 700;
+  font-size: var(--fs-in);
+}
+
+/* ---- Shared: pill buttons / links ---- */
+.about-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;           
+  padding: 0 1.5rem;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  text-decoration: none;
+  transition: transform .15s ease, background .15s ease;
+}
+.about-btn:hover { transform: translateY(-2px); }
+.about-btn--light { background: #fff; color: #B33A0A; }
+.about-btn--outline { background: transparent; color: #fff; }
+.about-btn--outline:hover { background: rgba(255, 255, 255, 0.18); }
+.about-btn:focus-visible,
+.about-pill:focus-visible,
+.about-faqitem__q:focus-visible,
+.about-faq__more:focus-visible {
+  outline: 3px solid var(--about-ink);
+  outline-offset: 3px;
+}
+
+/* ---- Shared: filter / toggle pills (same look as the dashboard filter pills) ---- */
+.about-pill {
+  min-height: 44px;
+  padding: 0 1.5rem;
+  border: 1.5px solid #F2B8B0;            /* soft pink outline */
+  border-radius: 999px;
+  background: var(--orange-soft);         /* pale pink fill */
+  color: var(--ink);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background .15s ease, color .15s ease, border-color .15s ease;
+}
+.about-pill:hover { background: #FBD9D3; }
+/* Active pill: deeper pink fill, red-orange text and outline */
+.about-pill.is-active {
+  background: #F5B7AC;
+  border-color: #E0675A;
+  color: #C2410C;
+  box-shadow: 0 4px 10px rgba(224, 70, 60, 0.18);
+}
+
+/* =====================================================================
+  HERO 
+   ===================================================================== */
+.about-hero {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-height: 460px;
+  text-align: center;
+  color: #fff;
+  overflow: hidden;
+  background: var(--orange); 
+}
+
+.about-hero__photo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.about-hero::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(58, 42, 34, 0.55);
+}
+.about-hero__inner {
+  position: relative;
+  z-index: 1;                   
+  display: flex;
+  flex-direction: column;
+  align-items: center;         
+  padding-block: var(--space-7, 4rem);
+}
+.about-hero__title {
+  color: var(--surface);
+  margin: 1.4rem 0 2rem;
+  max-width: 24ch;
+  font-size: clamp(2.0rem, 4vw, 3rem);
+  font-weight: 900;
+  line-height: 1.05;
+}
+/* Subheadline under the hero title. The negative top margin tucks it up under the title
+   so the existing title spacing does not need to change. */
+.about-hero__sub {
+  margin: -1rem 0 2rem;
+  max-width: 40rem;
+  font-size: var(--fs-base);
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.92);
+  text-align: center;
+}
+.about-hero__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 1rem;
+}
+
+/* =====================================================================
+   PHOTO PLACEHOLDER 
+   ===================================================================== */
+.about-ph {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  padding: 1rem;
+  background: var(--orange);
+  color: var(--text);
+  text-align: center;
+}
+.about-ph small { opacity: 0.8; }
+.about-hero .about-ph { background: transparent; color: rgba(255, 255, 255, 0.8); padding-top: 2rem; justify-content: flex-start; align-items: flex-end; text-align: right; }
+.about-hero .about-ph svg { display: none; }
+
+/* =====================================================================
+   INTRO — headline, subheadline, body, stats
+   ===================================================================== */
+.about-intro {
+  padding-block: 5rem 4.5rem;
+  text-align: center;
+}
+.about-intro__headline {
+  margin: 0;
+  font-size: clamp(2rem, 4vw, 3rem);
+  font-weight: 900;
+  letter-spacing: -0.02em;
+}
+.about-intro__sub {
+  margin: 0.70rem 0 0;
+  font-size: var(--fs-xl);
+  font-style: italic;
+  font-weight: 500;
+}
+.about-intro__body {
+  max-width: 46rem;
+  margin: 1rem auto 0;
+  font-size: var(--fs-base);
+  line-height: 1.7;
+}
+.about-stats {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 1.5rem 3.5rem;
+  margin: 2.5rem 0 0;
+}
+.about-stats__item { margin: 0; }
+.about-stats dt {
+  color: var(--danger);
+  font-size: var(--fs-base);
+  font-weight: 900;
+}
+.about-stats dd { margin: 0; font-weight: 600; font-size: var(--fs-sm); }
+
+/* =====================================================================
+   ABOUT US
+   ===================================================================== */
+.about-story { background: var(--orange-soft); padding-block: 5rem; }
+.about-story__grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 2.5rem;
+  align-items: center;
+}
+.about-story__img {
+  width: 100%;
+  height: 340px;
+  object-fit: cover;
+  border-radius: 24px;
+}
+.about-story p { font-size: var(--fs-base); line-height: 1.7; margin: 0 0 1rem; }
+.about-story__mission {
+  color: var(--orange-dark);
+  font-style: italic;
+  font-weight: 600;
+}
+@media (min-width: 860px) {
+  .about-story__grid { grid-template-columns: 1fr 1fr; gap: 4rem; }
+}
+
+/* =====================================================================
+   OUR SERVICES — cards + how it works
+   ===================================================================== */
+.about-services { padding-block: 5rem 4rem; }
+.about-services__grid {
+  display: grid;
+  grid-template-columns: 1fr;               
+  gap: 1.5rem;
+}
+@media (min-width: 600px) {
+  .about-services__grid { grid-template-columns: repeat(2, 1fr); }   /* tablet: 2x2 */
+}
+@media (min-width: 1000px) {
+  .about-services__grid { grid-template-columns: repeat(4, 1fr); }   /* desktop: 4 */
+}
+.about-card {
+  padding: 1.75rem;
+  border-radius: 20px;
+  background: var(--orange-soft);
+  border: 1px solid var(--border-strong);
+}
+.about-card__icon {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  margin-bottom: 1.1rem;
+  border-radius: 50%;
+  background: var(--danger);
+  color: #fff;
+}
+.about-card h3 { margin: 0 0 0.5rem; font-size: var(--fs-base); font-weight: 700; }
+.about-card p { margin: 0; font-size: var(--fs-sm); line-height: 1.6; }
+
+/* Students / Vendors toggle */
+.about-toggle {
+  font-size: var(--fs-base);
+  display: flex;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-top: 5rem;
+}
+
+/* Step tracker (same look as the order status tracker).
+   Mobile: vertical list. Desktop: horizontal row with lines between the circles. */
+.about-steps {
+  display: grid;
+  gap: 1.5rem;
+  margin: 3rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+.about-steps__item {
+  position: relative;
+  display: grid;
+  grid-template-columns: 40px 1fr;       
+  column-gap: 14px;
+  align-items: start;
+}
+/* The circle: white fill, red outline, red check */
+.about-steps__dot {
+  grid-row: 1 / span 2;
+  position: relative;
+  z-index: 1;                              
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 2px solid var(--danger);
+  background: var(--bg, #fff);
+  color: var(--danger);
+  font-weight: 800;                        
+  font-size: var(--fs-base);
+  line-height: 1;
+}
+.about-steps__title { font-weight: 800; font-size: var(--fs-base); line-height: 1.3; align-self: end; }
+.about-steps__text { font-size: var(--fs-sm); color: var(--text-muted); }
+
+/* Mobile: vertical line from each circle down to the next one */
+.about-steps__item:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  left: 19px;
+  top: 40px;
+  height: calc(100% - 40px + 1.5rem);
+  border-left: 2px solid var(--orange);
+}
+
+@media (min-width: 860px) {
+  .about-steps { grid-template-columns: repeat(4, 1fr); gap: 0; }
+  .about-steps__item {
+    grid-template-columns: 1fr;            /* stack: circle, title, text */
+    justify-items: center;
+    row-gap: 4px;
+    text-align: center;
+    padding-inline: 8px;
+  }
+  .about-steps__dot { grid-row: auto; margin-bottom: 8px; }
+  .about-steps__title { align-self: auto; }
+  /* Desktop: horizontal line from this circle to the next one */
+  .about-steps__item:not(:last-child)::after {
+    left: 50%;
+    top: 19px;
+    width: 100%;
+    height: 0;
+    border-left: 0;
+    border-top: 2px solid var(--orange);
+  }
+}
+
+/* ---- Step animations ----
+   Each step fades up one after another, the number circle pops, and the line draws toward the next step.
+   The animation starts when the list scrolls into view (.is-in) and replays when you switch Students/Vendors. */
+.about-steps__item { opacity: 0; }
+.about-steps.is-in .about-steps__item {
+  animation: about-step-in .5s ease forwards;
+  animation-delay: calc(var(--i) * 0.18s);
+}
+.about-steps.is-in .about-steps__dot {
+  animation: about-dot-pop .45s cubic-bezier(.3, 1.6, .5, 1) backwards;
+  animation-delay: calc(var(--i) * 0.18s + 0.1s);
+}
+/* The line starts hidden, then grows after its circle appears */
+.about-steps__item:not(:last-child)::after {
+  transform: scaleY(0);
+  transform-origin: top;           /* mobile: draws downward */
+}
+.about-steps.is-in .about-steps__item:not(:last-child)::after {
+  animation: about-line-y .4s ease forwards;
+  animation-delay: calc(var(--i) * 0.18s + 0.3s);
+}
+@media (min-width: 860px) {
+  .about-steps__item:not(:last-child)::after {
+    transform: scaleX(0);
+    transform-origin: left;        /* desktop: draws to the right */
+  }
+  .about-steps.is-in .about-steps__item:not(:last-child)::after {
+    animation-name: about-line-x;
+  }
+}
+@keyframes about-step-in { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+@keyframes about-dot-pop { from { transform: scale(0.4); } to { transform: scale(1); } }
+@keyframes about-line-y { to { transform: scaleY(1); } }
+@keyframes about-line-x { to { transform: scaleX(1); } }
+
+/* No motion for people who turn animations off: show everything immediately */
+@media (prefers-reduced-motion: reduce) {
+  .about-steps__item { opacity: 1; }
+  .about-steps__item:not(:last-child)::after { transform: none; }
+  .about-steps.is-in .about-steps__item,
+  .about-steps.is-in .about-steps__dot,
+  .about-steps.is-in .about-steps__item:not(:last-child)::after { animation: none; }
+}
+
+/* =====================================================================
+   FAQs 
+   ===================================================================== */
+.about .about-faq {
+  scroll-margin-top: var(--header-h, 72px);   /* keeps the sticky header from covering the title when linked to #faqs */
+  background-color: #FBD9D3;              /* fallback */
+  /* Pink at the top fading to cream at the bottom, like the dashboard */
+  background-image: linear-gradient(180deg, #F9C6BD 0%, #FCE3DE 55%, #FFF7F3 100%);
+  padding-block: 5rem;
+}
+.about-faq__grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 2.5rem;
+}
+@media (min-width: 900px) {
+  .about-faq__grid { grid-template-columns: 340px 1fr; gap: 4rem; }
+}
+.about-faq__grid p { font-size: var(--fs-base); line-height: 1.6; }
+
+/* Category pills stack vertically like the wireframe */
+.about-faq__pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+}
+@media (min-width: 900px) {
+  .about-faq__pills { flex-direction: column; align-items: flex-start; }
+}
+
+.about-faq__pills .about-pill {
+  min-height: 34px;                /* smaller buttons */
+  padding: 0 1.1rem;
+  font-size: var(--fs-sm);
+}
+
+.about-faq__list { display: flex; flex-direction: column; gap: 1rem; }
+
+/* One accordion card */
+.about-faqitem {
+  border-radius: 28px;
+  background: #FCE5E1;                    /* pale pink card */
+  border: 1.5px solid #F2B8B0;            /* pink outline */
+  overflow: hidden;
+  transition: background .15s ease, box-shadow .15s ease;
+}
+/* Open card: slightly deeper pink with a soft shadow */
+.about-faqitem.is-open {
+  background: #FADAD4;
+  box-shadow: 0 6px 16px rgba(224, 70, 60, 0.12);
+}
+.about-faqitem__q {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.25rem;
+  width: 100%;
+  padding: 1.2rem 1.5rem;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+.about-faqitem__q svg { flex: none; color: var(--danger); }
+.about-faq .about-faqitem__a {
+  margin: 0;
+  padding: 0 1.5rem 1.25rem;       /* same left padding as the question, so the text lines up */
+  font-size: var(--fs-sm);         /* smaller answer text (the grid's p rule was making it bigger) */
+  line-height: 1.6;
+  color: var(--text);
+  animation: about-open .2s ease;  
+}
+@keyframes about-open {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: none; }
+}
+
+.about-faq__more {
+  align-self: flex-start;
+  min-height: 44px;
+  padding: 0 1.5rem;
+  border: 1.5px solid #F2B8B0;           
+  border-radius: 999px;
+  background: var(--orange-soft);
+  color: var(--danger);
+  font: inherit;
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  cursor: pointer;
+  transition: background .15s ease;
+}
+.about-faq__more:hover { background: #FBD9D3; }
+
+/* Respect users who turn animations off */
+@media (prefers-reduced-motion: reduce) {
+  .about-btn, .about-pill, .about-faqitem__a { transition: none; animation: none; }
+}
+
+/* =====================================================================
+   DARK MODE 
+   ===================================================================== */
+[data-theme='dark'] .about {
+  --about-warm: #2B1F1A;
+  --about-ink: #F5E9E2;
+  --about-blush: #4A2E28;
+  --about-red-text: #FF9A8F;
+}
+[data-theme='dark'] .about .about-faq { background-color: var(--bg); background-image: linear-gradient(180deg, #3A2420 0%, var(--bg) 100%); }
+[data-theme='dark'] .about-faqitem { background: #3A2A22; border-color: var(--border-strong); }
+[data-theme='dark'] .about-faqitem.is-open { background: #4A2E28; }
+[data-theme='dark'] .about-pill { background: #3A2A22; color: var(--text); }
+[data-theme='dark'] .about-pill.is-active { background: #5A3028; color: #FF9A8F; }
+[data-theme='dark'] .about-ph { background: #3A2A22; color: #E8D8CF; }

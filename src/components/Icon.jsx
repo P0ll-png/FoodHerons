@@ -7,6 +7,8 @@ const paths = {
   pin: <path d="M12 3a6 6 0 0 0-6 6c0 4.2 6 11 6 11s6-6.8 6-11a6 6 0 0 0-6-6Zm0 3.5A2.5 2.5 0 1 1 12 11.5 2.5 2.5 0 0 1 12 6.5Z" fill="none" stroke="currentColor" strokeWidth="2" />,
   clock: <path d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18Zm0 4v5l3.5 2" fill="none" stroke="currentColor" strokeWidth="2" />,
   star: <path d="M12 3.5 14.6 9l6 .7-4.4 4.1 1.2 5.9L12 16.9 6.6 19.7l1.2-5.9L3.4 9.7l6-.7Z" fill="none" stroke="currentColor" strokeWidth="2" />,
+    // [ADD] filled twin of `star`: same path and stroke, so filled and empty stars are always the same size
+  starFilled: <path d="M12 3.5 14.6 9l6 .7-4.4 4.1 1.2 5.9L12 16.9 6.6 19.7l1.2-5.9L3.4 9.7l6-.7Z" fill="currentColor" stroke="currentColor" strokeWidth="2" />,
   sun: <path d="M12 7a5 5 0 1 0 0 10 5 5 0 0 0 0-10Zm0-5v3m0 14v3M4.2 4.2l2.1 2.1m11.4 11.4 2.1 2.1M2 12h3m14 0h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />,
   moon: <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z" />,
   user: <path d="M12 12a5 5 0 1 0 0-10 5 5 0 0 0 0 10Zm0 2c-5 0-9 2.5-9 6v2h18v-2c0-3.5-4-6-9-6Z" />,
@@ -69,6 +71,16 @@ const paths = {
   receipt: <path d="M6 3h12v18l-3-2-3 2-3-2-3 2V3Zm3 5h6M9 12h6M9 16h3" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />,
   review: <g fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 8v10l4-3h9a2 2 0 0 0 2-2v-2" /><path d="M8 11h5M8 14h3" /><path d="m17.5 2.5 1.1 2.2 2.4.4-1.7 1.7.4 2.4-2.2-1.1-2.2 1.1.4-2.4L14 5.1l2.4-.4 1.1-2.2Z" /></g>,
   starOutline: <path d="m12 17.3 6.2 3.7-1.6-7L22 9.2l-7.1-.6L12 2 9.1 8.6 2 9.2l5.4 4.8-1.6 7z" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />,
+  // [ADD] Multicolor Google "G" (keeps its own colors, ignores currentColor). Same artwork as the login/signup button,
+  // scaled from its 320x320 drawing area into the 24x24 icon box so it renders the same size as the other icons.
+  google: (<g transform="translate(-13.875 -3.75) scale(0.075)">
+      <path fill="#FF4B26" d="M345 50A160 160 0 0 0 207 130L261 161A97 97 0 0 1 345 113Z" />
+      <path fill="#D93F21" d="M345 50A160 160 0 0 1 452 92L413 139A97 97 0 0 0 345 113Z" />
+      <path fill="#FFD500" d="M207 130A160 160 0 0 0 207 290L261 260A97 97 0 0 1 261 161Z" />
+      <path fill="#14B54A" d="M207 290A160 160 0 0 0 345 370L345 307A97 97 0 0 1 261 260Z" />
+      <path fill="#0F9D45" d="M345 370A160 160 0 0 0 425 348L395 295A97 97 0 0 1 345 307Z" />
+      <path fill="#1A7FE8" d="M425 348A160 160 0 0 0 505 210L505 195Q505 183 493 183L364 183Q352 183 352 195L352 233Q352 245 364 245L437 245A97 97 0 0 1 395 295Z" />
+    </g>),
   facebook: <path d="M14 8h3V4h-3a4 4 0 0 0-4 4v2H7v4h3v8h4v-8h3l1-4h-4V8.6c0-.4.2-.6.6-.6Z" />,
   chevronCircle: (<g fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <circle cx="12" cy="12" r="9" />

@@ -35,7 +35,7 @@ const Stars = ({ value, size }) => (
   <span className="rv-stars" role="img" aria-label={`${value} out of 5 stars`}>
     {[1, 2, 3, 4, 5].map((n) => (
       <span key={n} className={n <= Math.round(value) ? 'rv-stars__on' : 'rv-stars__off'}>
-        <Icon name="star" size={size} className="rv-star" />
+        <Icon name={n <= Math.round(value) ? 'starFilled' : 'star'} size={size} className="rv-star" />   {/* [CHANGE] solid star when filled, outline when empty */}
       </span>
     ))}
   </span>
@@ -169,7 +169,7 @@ export default function ReviewsModal({
                 return (
                   <li key={n}>
                     <span className="rv-bars__label">{n}</span>
-                    <Icon name="star" size={13} className="rv-star" />
+                    <Icon name="starFilled" size={13} className="rv-star" />   {/* [CHANGE] solid star, matches the filled stars */}
                     <span className="rv-bars__track" aria-hidden="true">
                       <span className="rv-bars__fill" style={{ width: `${Math.max(pct, count ? 2 : 0)}%` }} />
                     </span>

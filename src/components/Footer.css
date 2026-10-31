@@ -4,16 +4,6 @@
   color: var(--footer-text);
   box-shadow: 0 -8px 20px rgba(0, 0, 0, 0.08);
 }
-.footer__wave {
-  margin-top: -48px;
-  margin-bottom: -1px;
-}
-.footer__wave {
-  /* Soft wave crest rising out of the page into the footer. */
-  margin-top: -48px;
-  margin-bottom: -1px;
-}
-
 .footer__grid {
   display: grid;
   grid-template-columns: 1fr;

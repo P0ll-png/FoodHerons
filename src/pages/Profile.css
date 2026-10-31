@@ -765,6 +765,11 @@
   background: #1877f2;
   color: var(--on-primary);
 }
+/* [ADD] Google icon sits on a white circle with a hairline border (the Google logo is multicolor, so no colored background) */
+.pf-connect__icon--google {
+  background: var(--surface);
+  border: 1px solid var(--pf-line);
+}
 .pf-connect__name {
   flex: 1;
   font-size: var(--fs-sm);
@@ -899,10 +904,11 @@
   border-color: var(--yellow-bright);
 }
 /* Order statuses: same colours as OrderStatus.css */
-.pf-pill--pending {
-  color: #8a5a00;
-  background: #fdf0c9;
-  border-color: #f1d9a0;
+/* Awaiting payment: same orange as OrderStatus.css (.status-pill--payment) */
+.pf-pill--payment {
+  color: var(--orange-dark);
+  background: var(--orange-soft);
+  border-color: var(--orange);
 }
 .pf-pill--accepted {
   color: #2a5ea8;
@@ -965,6 +971,8 @@
   color: inherit;
   cursor: pointer;
 }
+
+.pf-stars svg { display: block; }   /* [ADD] no inline baseline gap, so all stars line up evenly */
 .pf-reviewform {
   display: grid;
   gap: 10px;

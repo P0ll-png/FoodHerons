@@ -17,6 +17,8 @@ import NotFound from './pages/NotFound'
 import ScrollToTop from './components/ScrollToTop'
 import Search from './pages/Search'
 import Profile from './pages/Profile'
+import ConfirmEmail from './pages/ConfirmEmail'   // [ADD]
+import About from './pages/About'
 
 function AuthSplash() {
   return (
@@ -48,7 +50,7 @@ export default function App() {
   const hideChrome = inSection('/search') || inSection('/dashboard') || inSection('/profile')
 
   // Header stays on the cart, vendor store and order pages; only the footer is hidden
-  const hideFooter = hideChrome || inSection('/cart') || inSection('/vendor') || inSection('/order')
+  const hideFooter = hideChrome || inSection('/cart') || inSection('/vendor') || inSection('/order')  || inSection('/about')
 
   return (
     <ThemeProvider>
@@ -71,7 +73,10 @@ export default function App() {
             <Route path="/admin" element={<RequireRole role="admin"><Admin /></RequireRole>} />
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
+            <Route path="/about" element={<About />} />
+             <Route path="/auth/confirmed" element={<ConfirmEmail />} />   {/* [ADD] email confirmation landing page */}
             <Route path="*" element={<NotFound />} />
+            
           </Routes>
         </main>
         {!hideFooter && <Footer />}
