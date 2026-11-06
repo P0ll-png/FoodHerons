@@ -424,3 +424,21 @@ white-space: nowrap;    }
   .cart-empty .btn:hover, .cart-add:hover, .cart-clear:hover,
   .checkout .btn--primary:not(:disabled):hover { transform: none; }
 }
+
+/* ---- Quantity stepper (trash / minus / plus): no orange shadow anywhere ----
+   !important because the stepper's own style sits in another stylesheet with its own selectors.
+   Covers the pill, the circles, their icons and any pseudo-element glow, for both box-shadow and drop-shadow. */
+.cart-line .stepper,
+.cart-line .stepper *,
+.cart-line .stepper *::before,
+.cart-line .stepper *::after,
+.cart-line .stepper::before,
+.cart-line .stepper::after,
+.cart-line .stepper .stepper__btn:hover,
+.cart-line .stepper .stepper__btn:active,
+.cart-line .stepper .stepper__btn:focus,
+.cart-line .stepper .stepper__btn:focus-visible {
+  box-shadow: none !important;
+  filter: none !important;
+  text-shadow: none !important;
+}

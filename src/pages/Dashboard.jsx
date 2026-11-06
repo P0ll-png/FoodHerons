@@ -18,6 +18,9 @@ import './Dashboard.css'
 // Order of an order's life. A status can only move forward.
 const STATUS_ORDER = ['preparing', 'ready', 'completed'] // "pending" removed
 
+// Choices in the "Location/Stall Area" drop-down (Profile tab). Edit this list to add or remove locations.
+const LOCATION_AREAS = ['Main Gate', 'HPSB Building', 'Admin Lobby', 'Covered Court', 'Food Court', 'Back Gate', 'Unassigned']
+
 const PILL_LABEL = {
   preparing: 'Preparing',
   ready: 'Ready',
@@ -929,7 +932,14 @@ function ProfileTab({ saved, onSave, preorder, flash, vendor, categories }) {
             <h2 className="dashboard-card__title">Location &amp; Hours</h2>
             <div className="dashboard-field">
               <label htmlFor="p-loc">Location/Stall Area</label>
-              <input id="p-loc" className="dashboard-input" value={draft.locationArea} onChange={set('locationArea')} placeholder="e.g. Food Court, Stall 4" />
+              <select id="p-loc" className="dashboard-input" value={draft.locationArea} onChange={set('locationArea')}>
+                <option value="" disabled>Select a location</option>
+                {/* keeps an older, typed-in location selectable so it isn't lost */}
+                {draft.locationArea && !LOCATION_AREAS.includes(draft.locationArea) && (
+                  <option value={draft.locationArea}>{draft.locationArea}</option>
+                )}
+                {LOCATION_AREAS.map((a) => <option key={a} value={a}>{a}</option>)}
+              </select>
             </div>
             <div className="dashboard-grid2">
               <div className="dashboard-field">

@@ -145,8 +145,55 @@
   width: 16px;
   height: 16px;
 }
+.vcard__fav {
+  transition: transform 0.15s ease, color 0.2s ease;
+}
+.vcard__fav:hover { transform: scale(1.1); }
+.vcard__fav:active { transform: scale(0.88); } /* press shrink */
 .vcard__fav.is-active {
   color: #ff4d4f; /* red only when clicked */
+}
+
+/* ---------- Heart click animation ---------- */
+/* The heart does a double "heartbeat" pulse and a burst of little red dots
+   flies out around it. Plays when the heart becomes active.
+   Change the .6s to make it faster / slower, and the dot color below. */
+.vcard__fav.is-active svg {
+  animation: vcard-heart-beat 0.6s ease-in-out;
+}
+.vcard__fav.is-active::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 4px;
+  height: 4px;
+  margin: -2px 0 0 -2px;
+  border-radius: 50%;
+  background: #ff4d4f;            /* dot color */
+  pointer-events: none;
+  /* 8 dots around the heart (up, down, left, right + diagonals) */
+  box-shadow:
+    0 -13px #ff4d4f, 0 13px #ff4d4f, -13px 0 #ff4d4f, 13px 0 #ff4d4f,
+    -9px -9px #ff4d4f, 9px -9px #ff4d4f, -9px 9px #ff4d4f, 9px 9px #ff4d4f;
+  animation: vcard-heart-burst 0.55s ease-out forwards;
+}
+@keyframes vcard-heart-beat {
+  0%   { transform: scale(1); }
+  20%  { transform: scale(1.35); }
+  40%  { transform: scale(0.95); }
+  60%  { transform: scale(1.2); }
+  100% { transform: scale(1); }
+}
+@keyframes vcard-heart-burst {
+  0%   { transform: scale(0.3); opacity: 1; }
+  100% { transform: scale(2.2); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .vcard__fav.is-active svg,
+  .vcard__fav.is-active::after { animation: none; }
+  .vcard__fav:hover,
+  .vcard__fav:active { transform: none; }
 }
 
 /* =====================================================================

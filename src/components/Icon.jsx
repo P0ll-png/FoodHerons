@@ -106,6 +106,11 @@ const paths = {
     </g>),
       // Thumbs up (the "Helpful" button in the reviews pop-up)
   thumb: <path d="M7 10v11H3V10h4zM7 10l4-8c1.7 0 3 1.3 3 3v4h6a2 2 0 0 1 2 2.3l-1.4 8A2 2 0 0 1 18.6 21H7" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />,
+  // Our Services icons (About page)
+  bagCheck: (<g fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 8h12l1 12H5L6 8Z" /><path d="M9 8V7a3 3 0 0 1 6 0v1" /><path d="m9.5 14.2 1.7 1.7 3.3-3.4" /></g>),
+  wallet: (<g fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6a2 2 0 0 1 2-2h12.5A1.5 1.5 0 0 1 19 5.5V7" /><path d="M3 6v12a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2H5a2 2 0 0 1-2-1Z" /><circle cx="16.5" cy="13.5" r="1" fill="currentColor" /></g>),
+  barChart: (<g fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 20h18" /><rect x="5" y="11" width="3.5" height="9" rx="1" /><rect x="10.25" y="4" width="3.5" height="16" rx="1" /><rect x="15.5" y="8" width="3.5" height="12" rx="1" /></g>),
+  compass: (<g fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="m15.5 8.5-2 5-5 2 2-5 5-2Z" /></g>),
   // Small bold check (password rule met)
   checkBold: <path d="m5 12 5 5 9-10" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" />,
 }
