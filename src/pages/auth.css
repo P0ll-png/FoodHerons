@@ -153,8 +153,13 @@
 
 /* Terms line */
 .auth__terms { margin: 2px 0 0; text-align: center; color: #555; font-size: 11px; line-height: 1.5; }
-.auth__terms a { color: var(--orange-deep); font-weight: 700; text-decoration: none; }
-.auth__terms a:hover { text-decoration: underline; }
+.auth__terms a,
+.auth__terms-link { color: var(--orange-deep); font-weight: 700; text-decoration: none; }
+.auth__terms a:hover,
+.auth__terms-link:hover { text-decoration: underline; }
+/* .auth__terms-link is a <button> styled to read as an inline link */
+.auth__terms-link { padding: 0; border: 0; background: none; font-size: inherit; font-family: inherit; line-height: inherit; cursor: pointer; }
+.auth__terms-link:focus-visible { outline: 2px solid var(--orange-deep); outline-offset: 2px; border-radius: 3px; }
 
 /* Link pinned to the bottom of the card */
 .auth__alt { margin: auto 0 0; padding-top: 14px; text-align: center; color: #333; font-size: 11px; }

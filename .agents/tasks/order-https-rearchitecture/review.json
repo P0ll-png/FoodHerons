@@ -1,0 +1,11 @@
+{
+  "verdict": "APPROVED",
+  "findings": [
+    {
+      "severity": "non-blocking",
+      "label": "Live RPC migration unapplied",
+      "detail": "supabase/migrations/0007_order_rpcs.sql is authored and committed but not yet applied to the live Supabase project (verification.md shows rpc/place_order returning PGRST202). This is the single documented manual step (dashboard SQL editor) with copy-paste SQL and a pg_proc verification query, explicitly in-scope as a remaining manual step, not a code defect. Build and 78/78 unit tests are green."
+    }
+  ],
+  "reviewDoc": "c:\\Users\\paulc\\Projects\\FoodHerons\\.agents\\tasks\\order-https-rearchitecture\\semantic-review.md"
+}

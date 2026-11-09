@@ -1,0 +1,7 @@
+{
+  "task_id": "task-phase-c-order-service",
+  "task_description": "Phase C: build the ASP.NET Core (.NET 10) FoodHerons.Api order service (place order + status transition, server-side price/total, Supabase JWT auth, service-role Npgsql writes, xUnit tests) under server/, then wire the React frontend's Phase-C placeholders (Cart, OrderStatus, Dashboard) plus a Vite /api dev proxy to call it. No SQL changes; no secrets committed.",
+  "status": "completed",
+  "feature_order": ["FEAT-001", "FEAT-002"],
+  "blocked_reason": null
+}

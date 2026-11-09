@@ -1,0 +1,46 @@
+{
+  "verdict": "APPROVED",
+  "reviewDoc": "c:\\Users\\paulc\\Projects\\FoodHerons\\.agents\\tasks\\supabase-backend\\design-review.md",
+  "findings": [
+    {
+      "id": "N1",
+      "severity": "NIT",
+      "title": "Rev-5 fix #5 (App.jsx routes-block :40-50) applied in only one of three places",
+      "location": "design.md §5 rewire table (src/App.jsx row, ~line 581) and Change-1 recap 'Routes/nav' bullet (~line 765)",
+      "problem": "The Rev-5 fix claims the App.jsx routes-block citation was corrected to :40-50, but only §3 (~line 347) was updated. Two occurrences still read the stale App.jsx:42-50. Verified against source: <Routes> is at line 39, the <Route> entries span 40-49, </Routes> at 50; :42-50 wrongly starts at /vendor/:id and drops the first two routes (/, /search). :40-50 is correct, so the fix is only two-thirds applied, leaving an internal inconsistency.",
+      "fix": "Change both remaining 'App.jsx:42-50' citations (the §5 rewire-table row and the Change-1 'Routes/nav' recap bullet) to 'App.jsx:40-50'."
+    },
+    {
+      "id": "N2",
+      "severity": "NIT",
+      "title": "AuthContext.jsx:11,37 — second capitalized 'Student' is at line 33, not 37",
+      "location": "design.md §3 'Session handling in React' normalization note",
+      "problem": "Verified against source: role: 'Student' appears at line 11 (DEMO_STUDENT, correct) and at line 33 (const next = { role: 'Student', ... } inside login). There is no capitalized role literal at line 37 (37+ is updateUser).",
+      "fix": "Change 'AuthContext.jsx:11,37' to 'AuthContext.jsx:11,33'."
+    },
+    {
+      "id": "N3",
+      "severity": "NIT",
+      "title": "§5 demo-account store-name citations each off by one (point at id: line, not name: line)",
+      "location": "design.md §5 demo-accounts parenthetical; echoed in Rev-4 Finding-1 response",
+      "problem": "The store-name values are verbatim-correct against src/data/vendors.js (determinism holds), but the line numbers point one line high. Verified: name: 'Ate Len Noodle House' is at line 91 (cited :92), name: 'The Sweet Spot' at line 110 (cited :111), name: 'Kuya Boy Smoky Grill' at line 129 (cited :130) — each citation lands on the id: line above the name.",
+      "fix": "Change :92->:91, :111->:110, :130->:129. The name values themselves need no change."
+    },
+    {
+      "id": "N4",
+      "severity": "NIT",
+      "title": "isOpenNow() cited as VendorContext.jsx:22-27; function is at lines 21-26",
+      "location": "design.md §1 vendors note",
+      "problem": "Verified: 'export const isOpenNow = (open, close, date = new Date()) => {' is at line 21 and the function closes at line 26 (non-wrap branch at line 25). The cited :22-27 is off by one at both ends.",
+      "fix": "Change 'VendorContext.jsx:22-27' to 'VendorContext.jsx:21-26'."
+    },
+    {
+      "id": "N5",
+      "severity": "NIT",
+      "title": "currentVendorId cited as VendorContext.jsx:48-50; declaration starts at line 47",
+      "location": "design.md §5(a) admin-dashboard parameterization note",
+      "problem": "Verified: 'const currentVendorId = useMemo(' is at line 47; the body is at line 49 and deps [] at line 50 (construct spans 47-51). The cited :48-50 starts one line late.",
+      "fix": "Change 'VendorContext.jsx:48-50' to 'VendorContext.jsx:47-51' (or :47-50 to match the declaration start)."
+    }
+  ]
+}

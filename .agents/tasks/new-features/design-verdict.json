@@ -1,0 +1,39 @@
+{
+  "verdict": "CHANGES_REQUESTED",
+  "findings": [
+    {
+      "id": 1,
+      "severity": "MEDIUM",
+      "title": "Storage payment-proofs SELECT policy specified only in prose, not SQL",
+      "location": "design.md §4.3 step 3 (0010_order_payment.sql storage policies)",
+      "problem": "The INSERT policy for storage.objects is given verbatim, but the SELECT policy that governs who can mint a signed URL for a payment screenshot (student owner / vendor owner / admin) is described only as 'the analogous exists predicate joining orders (and vendors for the owner branch)'. This is the access-control boundary for student-uploaded financial proof images; leaving it as prose risks an implementer forgetting to constrain the vendor-owner branch to vendors.owner_id = auth.uid(), which would let any vendor sign a URL for any order's screenshot.",
+      "fix": "Pin the SELECT policy as explicit SQL with the three authorized reader classes: student owner (orders.student_id = auth.uid()), vendor owner (join vendors where owner_id = auth.uid()), and public.auth_role() = 'admin', keyed off split_part(name,'/',1)::uuid, matching the already-verbatim INSERT policy."
+    },
+    {
+      "id": 2,
+      "severity": "MEDIUM",
+      "title": "Admin OrdersPanel has no write scaffolding; reused run() helper lives in a different component",
+      "location": "design.md §4.5 (Admin.jsx admin verify/reject/cancel)",
+      "problem": "Verified in src/pages/Admin.jsx: the run() async-write helper (busy + setError + re-fetch) lives inside VendorRow (Vendors panel). OrdersPanel is a pure read-only table with no transitionOrder import, no busy/error state, and rows keyed by o.code. The design narrates the SELECT/row-key/button changes but never states OrdersPanel must grow its own write path, so 'reuse the existing run() helper' language misleads: OrdersPanel cannot reuse VendorRow.run (scoped to Vendors, writes via supabase.from('vendors')).",
+      "fix": "State in §4.5 that OrdersPanel must receive onChanged (=loadAll) and setError props like VendorsPanel/ReviewsPanel, import transitionOrder from ../lib/api, and implement its own per-row busy/reason/error handling. Note admin order writes go through the C# order service, unlike every existing admin write in that file."
+    },
+    {
+      "id": 3,
+      "severity": "NIT",
+      "title": "Widening StudentCancel auth to admin also grants admin cancel of plain pending orders",
+      "location": "design.md §4.4 (OrdersEndpoints.cs StudentCancel authorization)",
+      "problem": "The StudentCancel branch classifies both pending->cancelled and the new awaiting_payment/payment_submitted->cancelled. Adding '|| admin' to that one branch necessarily lets an admin cancel a plain pending order too, which is not a stated requirement. Unflagged authorization widening.",
+      "fix": "Either explicitly accept and document that admins may cancel any StudentCancel-classified order, or scope the admin allowance to only the pre-payment from-states (plan.From is awaiting_payment or payment_submitted). State the choice."
+    },
+    {
+      "id": 4,
+      "severity": "NIT",
+      "title": "Endpoint-side screenshot-path validation not authoritatively pinned",
+      "location": "design.md §4.4 (ValidateSubmitPayment) and §4.6 (screenshotPath rule)",
+      "problem": "The uuid-equals-route-id path check is correctly placed in the endpoint (not the pure service), but it is described twice with slightly different wording ('<uuid>/<name> shape, uuid equals route order id' vs '^<order-uuid>/.+') without a single authoritative statement of where it runs and what it returns.",
+      "fix": "State once that SubmitPaymentAsync (endpoint) rejects with 422 VALIDATION field=screenshotPath unless ScreenshotPath equals `{id}/{rest}` with non-empty rest and id the route GUID; keep reference-string rules in the pure ValidateSubmitPayment."
+    }
+  ],
+  "counts": { "HIGH": 0, "MEDIUM": 2, "NIT": 2 },
+  "reviewDoc": "c:\\Users\\paulc\\Projects\\FoodHerons\\.agents\\tasks\\new-features\\design-review.md"
+}

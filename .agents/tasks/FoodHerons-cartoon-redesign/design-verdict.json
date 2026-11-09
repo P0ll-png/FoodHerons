@@ -1,0 +1,54 @@
+    {
+  "verdict": "CHANGES_REQUESTED",
+  "findings": [
+    {
+      "id": 1,
+      "severity": "HIGH",
+      "title": "Logo-slot count is wrong: seven JSX call sites, not six; Login.jsx and Signup.jsx both missed",
+      "location": "design.md §2c (\"six such slots\"), §5 (\"Logo image load (6 slots)\"), §7 step 8 (\"all six slots\"), §4 auth entry",
+      "problem": "The mascot/LogoSlot work is a JSX markup change, but .auth__logo is rendered from two separate files (src/pages/Login.jsx line 21 and src/pages/Signup.jsx line 24), both verified to contain their own <img src=\"/logo.png\" onError>. So there are six slot classes but seven JSX call sites. §4 lists the auth edit once and never names Login.jsx and Signup.jsx as two distinct edits, so one auth page would be left with a hidden <img> and no mascot, violating the §5 'slot is never empty' invariant.",
+      "fix": "Change the count to 'six slot classes across seven JSX call sites' in §2c, §5, §7 step 8. In §4 replace the single auth line with two explicit edits: add <HeronMascot> fallback in src/pages/Login.jsx .auth__logo and in src/pages/Signup.jsx .auth__logo. If LogoSlot is adopted, state it replaces the <img onError> markup in all seven call sites (Header, Footer, VendorCard, VendorStore, Dashboard, Login, Signup)."
+    },
+    {
+      "id": 2,
+      "severity": "MEDIUM",
+      "title": "Existing .btn--primary { box-shadow: var(--shadow-sm) } not reconciled with new resting pop shadow",
+      "location": "design.md §2b button rules; §4 global.css entry",
+      "problem": "global.css already has a resting rule .btn--primary { background:...; color:...; box-shadow: var(--shadow-sm); } (verified). The new .btn--primary { box-shadow: var(--shadow-pop) } is the same specificity (0,1,0), so the winner is purely source order. 'Place variant rules after .btn:active' is ambiguous about whether the new rule lands after the EXISTING .btn--primary resting block; if placed before it, --shadow-sm wins and the pop shadow silently does nothing on the primary CTA.",
+      "fix": "State explicitly that the resting pop shadow must either replace box-shadow: var(--shadow-sm) inside the existing .btn--primary block in place, or be added as a rule placed after that existing declaration. Prefer merging in place to avoid two competing resting declarations."
+    },
+    {
+      "id": 3,
+      "severity": "MEDIUM",
+      "title": "Reduced-motion suppression list includes a .btn:hover transform that does not exist; added-motion inventory is inaccurate",
+      "location": "design.md §2b reduced-motion enumerated block and hover rules",
+      "problem": "The enumerated reduced-motion block lists .btn:hover under transform: none !important, implying a hover transform on .btn. The live .btn has no :hover transform (verified; .btn:active is the only button transform). Listing a non-existent hover transform misstates what motion is being added and will confuse the implementer. The hover box-shadow changes are static state (not motion) and should be explicitly noted as intentionally preserved.",
+      "fix": "Remove .btn:hover from the reduced-motion list (no such transform exists), OR add the intended .btn:hover lift explicitly in §2b if one is wanted. Keep .btn--primary:active, .btn--accent:active, .stepper__btn:active, .vcard:hover, .cat-tile:hover, .card:hover. Add a one-line note that hover box-shadow is a static state and is intentionally preserved under reduced motion."
+    },
+    {
+      "id": 4,
+      "severity": "NIT",
+      "title": ".role-switch__btn 8px->14px delta",
+      "location": "design.md §1b role-switch note; §4 auth entry",
+      "problem": "Verified .role-switch uses --radius-md and .role-switch__btn uses --radius-sm, so the 8->14 and 14->20 moves are accurate and intended. On the record; no change required.",
+      "fix": "None required. Optionally note it resolves to .role-switch__btn keeping border-radius: var(--radius-sm) (now 14px) with no edit."
+    },
+    {
+      "id": 5,
+      "severity": "NIT",
+      "title": "VendorStore star line reference is line-of-<li> not line-of-<Icon>",
+      "location": "design.md §2a (v), §4 (VendorStore.jsx:75)",
+      "problem": "name=\"star\" in VendorStore.jsx sits on the <li> opening at line 75; VendorCard star at :49 is exact. Close enough to locate; the grep target name=\"star\" is unambiguous (exactly two matches).",
+      "fix": "None required."
+    },
+    {
+      "id": 6,
+      "severity": "NIT",
+      "title": ".auth__logo 14px->--radius-lg (28px) on a 56px slot reads nearly fully rounded",
+      "location": "design.md §1b logo chips row; §4 auth entry",
+      "problem": "Verified .auth__logo is 56x56 with border-radius 14px. Moving to --radius-lg (28px) is half the box, a strong visual jump unlike the 110px store slot. Intended and safe (image/mascot under overflow:hidden) but not called out.",
+      "fix": "None blocking. Optionally note the corner reads as strongly rounded at 56px by design and confirm mascot artwork stays centered so rounding does not crop it."
+    }
+  ],
+  "reviewDoc": "c:\\Users\\paulc\\Projects\\FoodHerons\\.agents\\tasks\\FoodHerons-cartoon-redesign/design-review.md"
+}

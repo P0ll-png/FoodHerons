@@ -1,0 +1,7 @@
+{
+  "task_id": "task-phase-b-frontend",
+  "task_description": "Phase B + Phase B2 of the FoodHerons Supabase migration: rewire the React frontend from hardcoded seed data and a fake-auth shim to real Supabase Auth + direct-Supabase data reads/writes under RLS, add role-gated routes and an Admin management console, and delete the seed data files. FRONTEND ONLY in the worktree; no C# order service (Phase C) and no SQL changes (Phase A, merged). Order placement and status-transition writes stay Phase-C TODO placeholders.",
+  "status": "completed",
+  "feature_order": ["FEAT-001", "FEAT-002", "FEAT-003", "FEAT-004"],
+  "blocked_reason": null
+}

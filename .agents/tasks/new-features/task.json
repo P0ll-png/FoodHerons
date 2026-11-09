@@ -1,0 +1,7 @@
+{
+  "task_id": "task-admin-revenue-gcash",
+  "task_description": "Implement three features in the FoodHerons UMAK app under the worktree c:\\Users\\paulc\\Projects\\FoodHerons\\.worktrees\\new-features (branch feature/admin-revenue-gcash): (1) admin store approval + app management, (2) vendor client-side revenue PDF export, (3) GCash-gated manual pre-orders. The authoritative design is .agents/tasks/new-features/design.md (Revision 4); the ordered plan is .agents/tasks/new-features/plan.md.",
+  "status": "completed",
+  "feature_order": ["FEAT-001", "FEAT-002", "FEAT-003"],
+  "blocked_reason": null
+}

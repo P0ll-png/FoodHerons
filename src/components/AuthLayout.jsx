@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { Link } from 'react-router-dom'
 import Icon from '../components/Icon'
+import LegalModal from './LegalModal'
 import '../pages/auth.css'
 
 export const PASSWORD_RULES = [
@@ -95,10 +95,17 @@ export function GoogleButton({ onClick, label = 'Continue with Google' }) {
 }
 
 export function AuthTerms() {
+  const [legal, setLegal] = useState(null) // 'terms' | 'privacy' | null
   return (
-    <p className="auth__terms"> {/* The links are placeholder for now */}
-      By continuing, you agree to the <Link to="/">Terms</Link> and <Link to="/">Privacy Policy</Link>.
-    </p>
+    <>
+      <p className="auth__terms">
+        By continuing, you agree to the{' '}
+        <button type="button" className="auth__terms-link" onClick={() => setLegal('terms')}>Terms</button>
+        {' '}and{' '}
+        <button type="button" className="auth__terms-link" onClick={() => setLegal('privacy')}>Privacy Policy</button>.
+      </p>
+      <LegalModal kind={legal} onClose={() => setLegal(null)} />
+    </>
   )
 }
 export function AuthToast({ title, text, icon = 'mail', onClose }) {

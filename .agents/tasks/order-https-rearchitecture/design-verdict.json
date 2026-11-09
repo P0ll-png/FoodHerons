@@ -1,0 +1,18 @@
+{
+  "verdict": "APPROVED",
+  "findings": [
+    {
+      "severity": "NIT",
+      "location": "Test strategy / Files to change (OrderServiceEndpointFaultTests.cs modification)",
+      "problem": "The fault-test override uses the Db type and ThrowingHandler, but the design does not note that OrderServiceEndpointFaultTests.cs currently lacks 'using FoodHerons.Api.Data;' (and System.Net.Http), so the new code will not compile until those usings are added.",
+      "fix": "Add to the Files-to-change bullet: 'add using FoodHerons.Api.Data; (for Db) and using System.Net.Http; to the test file.'"
+    },
+    {
+      "severity": "NIT",
+      "location": "Writes via RPC — place_order request body",
+      "problem": "Each p_items element carries a per-item vendor_id that always equals the order-level p_vendor (verified in OrdersEndpoints.PlaceOrderAsync), but the design never states this single-vendor invariant or that the RPC does not cross-check them.",
+      "fix": "Add a one-line note: each item's vendor_id always equals p_vendor; the RPC does not cross-check, matching the current unconstrained order_items.vendor_id column (no FK)."
+    }
+  ],
+  "reviewDoc": "c:\\Users\\paulc\\Projects\\FoodHerons\\.agents\\tasks\\order-https-rearchitecture\\design-review.md"
+}
