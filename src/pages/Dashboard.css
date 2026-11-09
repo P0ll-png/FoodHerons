@@ -462,7 +462,7 @@
   background: #F4B8AC;
   border-color: #e36b67;
   color:var(--danger);
-  box-shadow: 0 4px 8px #F4B8AC;
+  box-shadow: 0 2px 6px #F4B8AC;
 }
 
 .dashboard-pill.is-active .dashboard-pill__count { background: var(--orange-dark); color: var(--surface); }

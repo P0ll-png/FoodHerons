@@ -400,7 +400,7 @@ gap: var(--space-2);
   color: var(--on-primary);
   display: grid;
   place-items: center;
-  box-shadow: var(--shadow-pop);
+  box-shadow: none; /* no orange shadow under the circles */
   transition: background var(--transition), transform var(--transition),
     box-shadow var(--transition);
 }
@@ -409,7 +409,7 @@ gap: var(--space-2);
 }
 .stepper__btn:active {
   transform: translateY(3px);
-  box-shadow: 0 2px 0 rgba(217, 74, 24, 0.18);
+  box-shadow: none;
 }
 .stepper__btn:disabled,
 .stepper__btn[aria-disabled="true"] {

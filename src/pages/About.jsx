@@ -1,46 +1,37 @@
-
 import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import Icon from '../components/Icon' 
+import Icon from '../components/Icon'
+import { useVendors } from '../context/VendorContext'
 import './About.css'
 
+// Hide broken images
+const hideBroken = (e) => { e.currentTarget.style.display = 'none' }
 
-// Stats strip under the headline.
-// TODO: replace the vendor/category numbers with live values from your API,
-// the same source your homepage uses ("10 vendors · 7 categories").
-const STATS = [
-  { value: '10', label: 'Vendors' },
-  { value: '7', label: 'Categories' },
-  { value: '100%', label: 'Pickup-based' },
-  { value: 'GCash', label: 'Secure payments' },
-]
-
-// "Our Services" cards. `icon` must be a key that exists in Icon.jsx.
+// Services list
 const SERVICES = [
   {
-    icon: 'bag',
+    icon: 'bagCheck',
     title: 'Pickup-Based Ordering',
     text: 'Order ahead and collect at the stall. No delivery, so food stays fresh and fees stay low.',
   },
   {
-    icon: 'lock',
+    icon: 'wallet',
     title: 'GCash Payments',
     text: 'Pay in the app. Your order is confirmed only after payment succeeds.',
   },
   {
-    icon: 'dashboard',
+    icon: 'barChart',
     title: 'Vendor Dashboard',
     text: 'Vendors accept and update orders in real time, and set their stall open or closed.',
   },
   {
-    icon: 'search',
+    icon: 'compass',
     title: 'Live Discovery',
     text: 'Search vendors, dishes and stall areas. See who is open now and browse by category.',
   },
 ]
 
-// "How it works" steps, one list per audience (the toggle picks which to show).
-// Each step has a bold title and a small line under it, like the order tracker.
+// How-it-works steps
 const STEPS = {
   students: [
     { title: 'Order', text: 'Browse and add to cart' },
@@ -56,8 +47,7 @@ const STEPS = {
   ],
 }
 
-// FAQ items. `category` matches the filter pills on the left.
-// `extra: true` items only appear after "Show more questions" is clicked.
+// FAQ content
 const FAQS = [
   {
     id: 'pickup',
@@ -75,7 +65,6 @@ const FAQS = [
     id: 'cancel',
     category: 'Ordering',
     q: 'Can I cancel or change my order?',
-    // TODO: confirm this policy with your team before publishing.
     a: 'You can cancel before the vendor accepts it. Once preparation has started, orders cannot be changed. If something goes wrong, contact support.',
   },
   {
@@ -146,12 +135,10 @@ const FAQS = [
   },
 ]
 
-// Filter pills (one category is always selected; no "All" option).
+// FAQ tabs
 const CATEGORIES = ['Ordering', 'Payments', 'Vendors']
 
-// ---------------------------------------------------------------------
-// PHOTO COMPONENT
-// ---------------------------------------------------------------------
+// Image with placeholder fallback
 function Photo({ src, alt, label, className = '' }) {
   const [failed, setFailed] = useState(false)
 
@@ -166,23 +153,34 @@ function Photo({ src, alt, label, className = '' }) {
   return <img className={className} src={src} alt={alt} onError={() => setFailed(true)} />
 }
 
-// ---------------------------------------------------------------------
-// PAGE COMPONENT
-// ---------------------------------------------------------------------
+// About page root
 export default function About() {
+  const { publicVendors, categories } = useVendors()
+  // Hero stats
+  const stats = [
+    { value: publicVendors.length, label: 'Vendors' },
+    { value: categories.length, label: 'Categories' },
+    { value: '100%', label: 'Pick-up based' },
+    { value: 'GCash', label: 'Secure Payments' },
+  ]
+
+  // State
   const [track, setTrack] = useState('students')
   const [category, setCategory] = useState('Ordering')
   const [openId, setOpenId] = useState('pickup')
   const [showAll, setShowAll] = useState(false)
+  // Visible FAQs
   const inCategory = FAQS.filter((f) => f.category === category)
   const hasExtras = inCategory.some((f) => f.extra)
   const visibleFaqs = inCategory.filter((f) => showAll || !f.extra)
+  // Switch FAQ tab
   const selectCategory = (c) => {
     setCategory(c)
     setShowAll(false)
     setOpenId(FAQS.find((f) => f.category === c)?.id ?? null)
   }
 
+  // Deep link to FAQs (#faqs, ?faq=)
   const { hash, search, key } = useLocation()
   useEffect(() => {
     const wanted = new URLSearchParams(search).get('faq')?.toLowerCase()
@@ -193,9 +191,9 @@ export default function About() {
     const goToFaqs = () => document.getElementById('faqs')?.scrollIntoView({ block: 'start' })
     const timers = [0, 120, 350].map((ms) => setTimeout(goToFaqs, ms))
     return () => timers.forEach(clearTimeout)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hash, search, key])
 
+  // Reveal steps on scroll
   const stepsRef = useRef(null)
   const [stepsSeen, setStepsSeen] = useState(false)
   useEffect(() => {
@@ -207,64 +205,58 @@ export default function About() {
     io.observe(el)
     return () => io.disconnect()
   }, [])
+  // Open / close FAQ
   const toggleFaq = (id) => setOpenId((cur) => (cur === id ? null : id))
 
   return (
     <main className="about">
-      {/* =====  HERO / CTA PHOTO — centered message and buttons ===== */}
+      {/* Hero */}
       <section className="about-hero" aria-labelledby="about-hero-title">
-        {/* PHOTO PLACEHOLDER: full-width hero photo (wide, about 1600x700).
-            File: /public/images/umak.about.jpeg. Sits behind the text. */}
-        <Photo
-          className="about-hero__photo"
-          src="/images/umak.about.jpeg"
-          alt="Students ordering food at a campus stall"
-          label=""
-        />
-        <div className="container about-hero__inner">
+        <div className="about-hero__art" aria-hidden="true">
+          <span className="about-hero__blob" />
+          <img className="about-hero__bowl" src="/images/bowl.png" alt="" onError={hideBroken} />
+        </div>
+        <div className="about-hero__inner">
           <span className="about-tag">University of Makati</span>
           <h1 id="about-hero-title" className="about-hero__title">
-            Campus Food, Found Fast
+            <span>Campus Food,</span> <span>Found fast</span>
           </h1>
-          {/* Hero subheadline */}
           <p className="about-hero__sub">
-            Your break is short. Order ahead from your favorite campus stalls
-            and spend it eating, not waiting.
+            Order ahead. Skip the line. Enjoy your break.
           </p>
           <div className="about-hero__actions">
-            <Link to="/" className="about-btn about-btn--light">Start Ordering</Link>
-            <Link to="/signup?role=vendor" className="about-btn about-btn--outline">Become a Vendor</Link>
+            <Link to="/" className="about-btn about-btn--primary">Start ordering</Link>
+            <Link to="/signup?role=vendor" className="about-btn about-btn--ghost">Become a vendor</Link>
           </div>
         </div>
       </section>
 
-      {/* ===== HEADLINE + SUBHEADLINE + STATS ===== */}
+      <div className="about-panel">
+
+      {/* Intro + stats */}
       <section className="about-intro container">
         <h2 className="about-intro__headline">ORDER AHEAD. PICK UP FAST.</h2>
-        <p className="about-intro__sub">Connecting Herons to campus bites.</p>
+        <p className="about-intro__sub">Connecting Herons to Campus Bites.</p>
         <p className="about-intro__body">
-          FoodHerons connects University of Makati students with the stalls around campus.
-          Browse menus, order from your phone, pay securely with GCash, and pick up your food
-          when it is ready.
+          FoodHerons lets University of Makati students order ahead from campus stalls.
+          Browse menus, pay via GCash, and pick up when ready.
         </p>
         <dl className="about-stats">
-          {STATS.map((s) => (
-            <div key={s.label} className="about-stats__item">
-              <dt>{s.value}</dt>
-              <dd>{s.label}</dd>
+          {stats.map((st) => (
+            <div key={st.label} className="about-stats__item">
+              <dt>{st.value}</dt>
+              <dd>{st.label}</dd>
             </div>
           ))}
         </dl>
       </section>
 
-      {/* =====  OUR STORY — photo left, text right ===== */}
+      {/* Story */}
       <section className="about-story">
         <div className="container about-story__grid">
-          {/* PHOTO PLACEHOLDER: story photo (about 1000x680).
-              File: /public/images/about-story.jpg */}
           <Photo
             className="about-story__img"
-            src="/images/about-story.jpg"
+            src="/images/umak.jpg"
             alt="A vendor handing an order to a student"
             label="Vendor handing an order to a student"
           />
@@ -282,11 +274,10 @@ export default function About() {
         </div>
       </section>
 
-      {/* =====  OUR SERVICES — four cards + "How it works" ===== */}
+      {/* Services + steps */}
       <section className="about-services container">
         <h2 className="about-title about-title--center">Our Services</h2>
 
-        {/*  Service cards (4 columns desktop, 2 tablet, 1 mobile) */}
         <div className="about-services__grid">
           {SERVICES.map((s) => (
             <article key={s.title} className="about-card">
@@ -297,7 +288,6 @@ export default function About() {
           ))}
         </div>
 
-        {/*Students / Vendors toggle */}
         <div className="about-toggle" role="group" aria-label="How it works for">
           <button
             type="button"
@@ -317,7 +307,6 @@ export default function About() {
           </button>
         </div>
 
-        {/* Step tracker (same look as the order status tracker). */}
         <ol key={track} ref={stepsRef} className={`about-steps ${stepsSeen ? 'is-in' : ''}`}>
           {STEPS[track].map((step, i) => (
             <li
@@ -333,10 +322,9 @@ export default function About() {
         </ol>
       </section>
 
-      {/* ===== FAQs — title + pills left, accordion right ===== */}
+      {/* FAQs */}
       <section className="about-faq" id="faqs">
         <div className="container about-faq__grid">
-          {/* Left column: title, intro text, category filter pills */}
           <div>
             <h2 className="about-title">Frequently asked Questions</h2>
             <p>Quick answers about ordering, payments and pickup.</p>
@@ -355,13 +343,11 @@ export default function About() {
             </div>
           </div>
 
-          {/* Right column: accordion cards */}
           <div className="about-faq__list">
             {visibleFaqs.map((f) => {
               const open = openId === f.id
               return (
                 <div key={f.id} className={`about-faqitem ${open ? 'is-open' : ''}`}>
-                  {/* The question is a real button so it works with keyboard and screen readers */}
                   <button
                     type="button"
                     className="about-faqitem__q"
@@ -379,8 +365,7 @@ export default function About() {
               )
             })}
 
-            {/* Toggle: reveals the extra questions, then switches to "Show fewer questions".
-                Only shown when the selected category actually has extra questions. */}
+            {/* Show more / fewer */}
             {hasExtras && (
               <button
                 type="button"
@@ -394,6 +379,7 @@ export default function About() {
           </div>
         </div>
       </section>
+      </div>
     </main>
   )
 }

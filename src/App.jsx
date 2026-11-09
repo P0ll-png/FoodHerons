@@ -47,10 +47,10 @@ function RequireRole({ role, children }) {
 export default function App() {
   const { pathname } = useLocation()
   const inSection = (base) => pathname === base || pathname.startsWith(`${base}/`)
-  const hideChrome = inSection('/search') || inSection('/dashboard') || inSection('/profile')
+  const hideChrome = inSection('/search') || inSection('/dashboard') || inSection('/profile') || inSection('/admin')
 
   // Header stays on the cart, vendor store and order pages; only the footer is hidden
-  const hideFooter = hideChrome || inSection('/cart') || inSection('/vendor') || inSection('/order')  || inSection('/about')
+  const hideFooter = hideChrome || inSection('/cart') || inSection('/vendor') || inSection('/order')  
 
   return (
     <ThemeProvider>
