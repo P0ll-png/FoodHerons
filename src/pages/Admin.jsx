@@ -1050,7 +1050,6 @@ function ReviewsPanel({ reviews, vendorName, onChanged, setError }) {
     </ul>
 
     {confirmReview && (
-      {/* Delete confirm */}
       <ConfirmModal
         title={`Delete ${confirmReview.author_name}'s review?`}
         text={`This review of ${vendorName(confirmReview.vendor_id)} is removed for everyone. This cannot be undone.`}

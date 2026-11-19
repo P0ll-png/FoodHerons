@@ -70,6 +70,32 @@ const STATE_UI = {
       </>
     ),
   },
+  // Vendor sent a refund; the order is only final once the student confirms receiving it
+  refund: {
+    tone: 'payment',
+    icon: 'wallet',
+    title: 'Confirm your refund',
+    pill: 'Refund pending',
+    subtitle: (o) => (
+      <>
+        <strong>{o.vendorName}</strong> could not fulfill order <strong>{o.id}</strong>.
+        Please confirm that you received your refund.
+      </>
+    ),
+  },
+  // Vendor rejected the order (cancel reason carries a refund reference)
+  rejected: {
+    tone: 'cancelled',
+    icon: null,
+    title: 'Order rejected',
+    pill: 'Rejected',
+    subtitle: (o) => (
+      <>
+        Order <strong>{o.id}</strong> at <strong>{o.vendorName}</strong> was
+        rejected by the vendor.
+      </>
+    ),
+  },
   accepted: {
     tone: 'accepted',
     icon: 'utensils',
@@ -123,6 +149,35 @@ const DB_STATUS_TO_STEP = {
 
 // NEW: reasons offered in the cancel pop-up
 const CANCEL_REASONS = ['Changed my mind', 'Ordered by mistake', 'Wrong items or details', 'Taking too long', 'Other']
+
+// NEW: pop-up that asks the student to confirm the GCash refund after a vendor rejection
+function RefundDialog({ total, refundRef, busy, error, onClose, onConfirm }) {
+  useEffect(() => {
+    const onKey = (e) => e.key === 'Escape' && !busy && onClose()
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [busy, onClose])
+
+  return (
+    <div className="cancel-overlay" onMouseDown={(e) => e.target === e.currentTarget && !busy && onClose()}>
+      <div className="cancel-modal refund-modal" role="dialog" aria-modal="true" aria-labelledby="refund-title">
+        <h2 id="refund-title" className="cancel-modal__title">Did you receive your refund?</h2>
+        <p className="cancel-modal__text">
+          The vendor says they refunded ₱{Number(total || 0).toLocaleString('en-PH')} to your GCash
+          {refundRef ? <> (ref. <strong>{refundRef}</strong>)</> : null}. Check your GCash app, then confirm.
+          The order is only marked as rejected after you confirm.
+        </p>
+        {error && <p className="order-review__error" role="alert">{error}</p>}
+        <div className="cancel-modal__actions">
+          <button type="button" className="refund-btn refund-btn--outline" onClick={onClose} disabled={busy}>Not yet</button>
+          <button type="button" className="refund-btn refund-btn--primary" onClick={onConfirm} disabled={busy}>
+            {busy ? 'Confirming…' : 'Yes, I received it'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 // NEW: pop-up that asks the student why they are cancelling
 function CancelDialog({ busy, error, onClose, onConfirm }) {
@@ -464,6 +519,9 @@ export default function OrderStatus() {
   const [cancelError, setCancelError] = useState('')
   const [showCancel, setShowCancel] = useState(false) 
   const [showContact, setShowContact] = useState(false) 
+  const [showRefund, setShowRefund] = useState(false) // refund confirmation pop-up
+  const [confirmingRefund, setConfirmingRefund] = useState(false)
+  const [refundError, setRefundError] = useState('')
 
   // Load the real order (RLS lets a student read only their own orders).
   // Status is always read straight from Supabase — only the write (cancel)
@@ -471,7 +529,7 @@ export default function OrderStatus() {
   const fetchOrder = useCallback(async () => {
     const { data, error } = await supabase
       .from('orders')
-      .select('id, code, vendor_id, status, total, pickup_name, note, gcash_reference, payment_submitted_at, payment_rejected_reason, order_items(name, qty, unit_price)')
+      .select('id, code, vendor_id, status, total, pickup_name, note, gcash_reference, payment_submitted_at, payment_rejected_reason, cancel_reason, refund_confirmed_at, reject_reason, refund_reference, refund_requested_at, order_items(name, qty, unit_price)')
       .eq('id', id)
       .single()
     if (error || !data) return null
@@ -486,6 +544,11 @@ export default function OrderStatus() {
       gcashReference: data.gcash_reference,
       paymentSubmittedAt: data.payment_submitted_at,
       paymentRejectedReason: data.payment_rejected_reason,
+      cancelReason: data.cancel_reason,
+      refundConfirmedAt: data.refund_confirmed_at,
+      rejectReason: data.reject_reason,
+      refundReference: data.refund_reference,
+      refundRequestedAt: data.refund_requested_at,
       lines: (data.order_items ?? []).map((oi) => ({ name: oi.name, qty: oi.qty, price: oi.unit_price })),
     }
   }, [id])
@@ -538,6 +601,30 @@ export default function OrderStatus() {
     }
   }
 
+  // Vendor-rejected order whose refund the student has not confirmed yet.
+  // Auto-open the confirmation pop-up when the page loads in that state.
+  const refundPendingNow = Boolean(order?.refundRequestedAt) && order?.status !== 'cancelled'
+  useEffect(() => {
+    if (refundPendingNow) setShowRefund(true)
+  }, [orderUuid, refundPendingNow])
+
+  // Student confirms the refund arrived. Saved through the confirm_refund DB function.
+  const confirmRefund = async () => {
+    setConfirmingRefund(true)
+    setRefundError('')
+    try {
+      const { error } = await supabase.rpc('confirm_refund', { p_order_id: order.uuid })
+      if (error) throw error
+      const refreshed = await fetchOrder()
+      if (refreshed) setOrder(refreshed)
+      setShowRefund(false)
+    } catch (err) {
+      setRefundError(err?.message || 'We couldn’t confirm the refund. Please try again.')
+    } finally {
+      setConfirmingRefund(false)
+    }
+  }
+
   if (loading) {
     return (
       <div className="container section">
@@ -566,14 +653,24 @@ export default function OrderStatus() {
   const stepKey = DB_STATUS_TO_STEP[order.status] ?? 'payment'
   const stepIndex = Math.max(0, STEPS.findIndex((s) => s.key === stepKey))
   const current = STEPS[stepIndex]
-  const isAwaitingPayment = order.status === 'awaiting_payment'
-  const isPaymentSubmitted = order.status === 'payment_submitted'
+  // The vendor rejected the order and sent a refund; it stays NOT canceled until the student confirms it
+  const refundPending = Boolean(order.refundRequestedAt) && order.status !== 'cancelled'
+  const isAwaitingPayment = order.status === 'awaiting_payment' && !refundPending
+  const isPaymentSubmitted = order.status === 'payment_submitted' && !refundPending
   const isCancelled = order.status === 'cancelled' // [CHANGE] NEW
   // In the payment step, the two DB states map to distinct copy; elsewhere the
   // UI is keyed off the tracker step.
   // [CHANGE] cancelled is checked first so it never shows a payment/tracker state
-  const ui = isCancelled
-    ? STATE_UI.cancelled
+  // Vendor rejections are saved as "<reason> · Refund ref: <number>"; student cancels never have that part
+  const [parsedWhy, parsedRef] = (order.cancelReason || '').split(' · Refund ref: ')
+  const rejectWhy = refundPending ? order.rejectReason : parsedWhy
+  const rejectRefund = refundPending ? order.refundReference : parsedRef
+  // Rejected = canceled by the vendor with a refund (the order only becomes canceled after the student confirms it)
+  const isRejected = isCancelled && (order.cancelReason || '').includes(' · Refund ref: ')
+  const ui = refundPending
+    ? STATE_UI.refund
+    : isCancelled
+    ? (isRejected ? STATE_UI.rejected : STATE_UI.cancelled)
     : isAwaitingPayment
     ? STATE_UI.payment
     : isPaymentSubmitted
@@ -639,14 +736,39 @@ export default function OrderStatus() {
 
           {/* [CHANGE] A canceled order has no progress to track, so show a short message
               instead of the tracker */}
-          {isCancelled && (
+          {isCancelled && !isRejected && !refundPending && (
             <p className="text-muted" role="status">
               This order was canceled, so there is nothing left to track.
             </p>
           )}
+          {/* Refund sent but not confirmed yet: ask the student to confirm */}
+          {refundPending && (
+            <div className="order-reject" role="status">
+              <p className="order-reject__lead">Waiting for your refund confirmation.</p>
+              {rejectWhy && <p><strong>Reason:</strong> {rejectWhy}</p>}
+              <p>The vendor sent a refund to your GCash (ref. {rejectRefund}). Confirm once you have received it.</p>
+              <div className="order-reject__action">
+                <button type="button" className="order-btn order-btn--primary" onClick={() => setShowRefund(true)}>
+                  Confirm refund
+                </button>
+              </div>
+            </div>
+          )}
+          {/* Vendor rejected the order: say so, with the reason and the refund reference */}
+          {isRejected && (
+            <div className="order-reject" role="status">
+              <p className="order-reject__lead">The vendor rejected this order.</p>
+              {rejectWhy && (
+                <p><strong>Reason:</strong> {rejectWhy}</p>
+              )}
+              {rejectRefund && (
+                <p><strong>Refund:</strong> Confirmed received (ref. {rejectRefund}).</p>
+              )}
+            </div>
+          )}
 
           {/* Tracker*/}
-          {!isCancelled && (
+          {!isCancelled && !refundPending && (
           <ol className="tracker">
             {STEPS.map((step, i) => {
               const state =
@@ -790,7 +912,7 @@ export default function OrderStatus() {
 
               {/* [CHANGE] condition was `!isPending && !isCompleted`; isPending no longer exists.
                   Also hidden for canceled orders (nothing to contact the vendor about) */}
-              {!isCompleted && !isCancelled && (
+              {!isCompleted && !isCancelled && !refundPending && (
                 <button
                   type="button"
                   className="order-btn order-btn--contact order-btn--block" /* CHANGED: new plain icon + text style (was order-btn--outline) */
@@ -874,6 +996,18 @@ export default function OrderStatus() {
           phone={vendor?.phone}
           orderId={order.id}
           onClose={() => setShowContact(false)}
+        />
+      )}
+
+      {/* NEW: refund confirmation pop-up (after the vendor rejects an order) */}
+      {showRefund && refundPending && (
+        <RefundDialog
+          total={order.total}
+          refundRef={rejectRefund}
+          busy={confirmingRefund}
+          error={refundError}
+          onClose={() => { setShowRefund(false); setRefundError('') }}
+          onConfirm={confirmRefund}
         />
       )}
 

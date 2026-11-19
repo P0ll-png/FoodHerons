@@ -1,7 +1,5 @@
-import { useState } from 'react'
 import { Link, NavLink, useNavigate } from 'react-router-dom'
 import Icon from './Icon'
-import Avatar from './Avatar'
 import { useTheme } from '../context/ThemeContext'
 import { useCart } from '../context/CartContext'
 import { useAuth } from '../context/AuthContext'
@@ -11,18 +9,18 @@ export default function Header() {
   const { theme, toggleTheme } = useTheme()
   const { count } = useCart()
   const { user } = useAuth()
-  const [open, setOpen] = useState(false)
   const navigate = useNavigate()
 
-  const closeMenu = () => setOpen(false)
   const profilePath = user?.role === 'admin' ? '/admin' : user?.role === 'vendor' ? '/dashboard' : '/profile'
-  const firstName = user?.full_name?.trim().split(/\s+/)[0]
+  // One icon button for everyone: log in (guests), dashboard (vendors), admin panel (admins), profile (students)
+  const iconTo = !user ? '/login' : profilePath
+  const iconLabel = !user ? 'Log in or sign up' : user.role === 'vendor' ? 'Vendor Dashboard' : user.role === 'admin' ? 'Admin' : 'My profile'
 
   return (
     <header className="header">
       <div className="container header__bar">
         {/* Logo area */}
-        <Link to="/" className="brand" onClick={closeMenu} aria-label="Food Herons home">
+        <Link to="/" className="brand" aria-label="Food Herons home">
           <span className="brand__logo">
             <img
               src="/images/logo.jpg"
@@ -39,49 +37,8 @@ export default function Header() {
           </span>
         </Link>
 
-        <nav className={`nav ${open ? 'nav--open' : ''}`} aria-label="Primary">
-          <NavLink to="/" end className="nav__link" onClick={closeMenu}>
-            Discover
-          </NavLink>
-          {user?.role === 'vendor' && (
-            <NavLink to="/dashboard" className="nav__link" onClick={closeMenu}>
-              Vendor Dashboard
-            </NavLink>
-          )}
-          {user?.role === 'admin' && (
-            <NavLink to="/admin" className="nav__link" onClick={closeMenu}>
-              Admin
-            </NavLink>
-          )}
-          {user ? (
-            <NavLink to={profilePath} className="nav__link nav__link--profile" onClick={closeMenu}>
-              My profile
-            </NavLink>
-          ) : (
-            <>
-              <NavLink to="/login" className="nav__link" onClick={closeMenu}>
-                Log in
-              </NavLink>
-              <Link to="/signup" className="btn btn--primary nav__cta" onClick={closeMenu}>
-                Sign up
-              </Link>
-            </>
-          )}
-        </nav>
-
         <div className="header__actions">
-          {user && (
-            <NavLink
-              to={profilePath}
-              className="profile-chip"
-              onClick={closeMenu}
-              aria-label={`${user.full_name || 'Student'} — open profile`}
-            >
-              <Avatar name={user.full_name} src={user.avatar_url} size={34} className="profile-chip__avatar" />
-              <span className="profile-chip__name">{firstName}</span>
-            </NavLink>
-          )}
-
+          {/* Order: theme, home, cart, then log in / sign up */}
           <button
             className="icon-btn"
             onClick={toggleTheme}
@@ -89,6 +46,10 @@ export default function Header() {
           >
             <Icon name={theme === 'dark' ? 'sun' : 'moon'} />
           </button>
+
+          <NavLink to="/" end className="icon-btn" aria-label="Discover" title="Discover">
+            <Icon name="houseRounded" size={24} />
+          </NavLink>
 
           <button
             className="icon-btn icon-btn--cart"
@@ -99,14 +60,9 @@ export default function Header() {
             {count > 0 && <span className="cart-count">{count}</span>}
           </button>
 
-          <button
-            className="icon-btn nav-toggle"
-            onClick={() => setOpen((o) => !o)}
-            aria-expanded={open}
-            aria-label={open ? 'Close menu' : 'Open menu'}
-          >
-            <Icon name={open ? 'close' : 'menu'} />
-          </button>
+          <NavLink to={iconTo} className="icon-btn" aria-label={iconLabel} title={iconLabel}>
+            <Icon name="userOutline" size={24} />
+          </NavLink>
         </div>
       </div>
     </header>

@@ -645,8 +645,13 @@
   border-radius: var(--radius-xl);
   border: 1px dashed var(--border-strong);
 }
-.empty__emoji {
-  font-size: 2.5rem;
+.empty__icon {
+  display: inline-flex;
+  color: var(--orange);
+}
+.empty .btn--primary {
+  box-shadow: none;
+  text-shadow: none;
 }
 .empty h3 {
   margin-top: var(--space-3);

@@ -1073,7 +1073,7 @@
 /* Edit store form */
 .admin-modal--form {
   width: min(640px, 100%);
-   background: var(--bg);
+   background: #fff;
 }
 .admin-modal__grid {
   display: grid;

@@ -355,6 +355,16 @@ function Orders({ active, past, onReorder, onOpen }) {
                   <p className="pf-order__items">
                     {o.items.map((it, i) => <span key={i}><b>{it.qty}×</b> {it.name}{i < o.items.length - 1 ? ', ' : ''}</span>)}
                   </p>
+                  {/* Vendor rejected the order: show the reason and the GCash refund reference */}
+                  {o.rawStatus === 'cancelled' && (() => {
+                    const [why, refund] = (o.cancelReason || '').split(' · Refund ref: ')
+                    return (
+                      <p className="pf-order__reject">
+                        Rejected by the vendor{why ? `: ${why}` : ''}.
+                        {refund ? ` Refunded to your GCash (ref. ${refund}).` : ''}
+                      </p>
+                    )
+                  })()}
                 </div>
                 <strong className="pf-order__total">₱{o.total}</strong>
                 <div className="pf-order__actions">
@@ -780,7 +790,7 @@ export default function Profile() {
       const [ordersRes, favRes, reviewsRes] = await Promise.all([
         supabase
           .from('orders')
-          .select('id, code, vendor_id, status, total, placed_at, order_items(name, qty, unit_price)')
+          .select('id, code, vendor_id, status, total, placed_at, cancel_reason, order_items(name, qty, unit_price)')
           .eq('student_id', userId)
           .order('placed_at', { ascending: false }),
         supabase.from('favorites').select('vendor_id').eq('student_id', userId),
@@ -800,6 +810,8 @@ export default function Profile() {
         vendor: vendorLabel(o.vendor_id),
         status: DB_STATUS_LABEL[o.status] ?? o.status,
         rawStatus: o.status,
+        // Set when the vendor rejects the order: "<reason> · Refund ref: <number>"
+        cancelReason: o.cancel_reason || undefined,
         total: o.total,
         date: o.placed_at ? new Date(o.placed_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '',
         items: (o.order_items ?? []).map((oi) => ({ qty: oi.qty, name: oi.name })),

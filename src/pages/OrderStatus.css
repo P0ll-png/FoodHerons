@@ -1059,3 +1059,29 @@
 
 /* Dark mode: keep the gray "no number" icon readable */
 [data-theme="dark"] .contact-modal__icon--empty { background: #6f6560; box-shadow: 0 0 0 8px #2b2321; }
+
+/* Vendor-rejected order message */
+.order-reject { display: grid; gap: var(--space-2); font-size: var(--fs-sm); color: var(--text-muted); }
+.order-reject p { margin: 0; font-size: inherit; }
+.order-reject strong { color: var(--text); }
+.order-reject__lead { font-weight: 700; color: var(--danger); }
+
+/* Refund confirmation pop-up: white card, pill buttons (outline + solid orange) */
+.order-reject__action { margin-top: var(--space-4); }
+.cancel-modal.refund-modal { background: #fff; }
+.refund-btn {
+  min-height: 40px;
+  padding: 0 20px;
+  border-radius: 999px;
+  font: inherit;
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.refund-btn--outline { background: #fff; border: 1px solid var(--border-strong); color: var(--ink, var(--text)); }
+.refund-btn--primary { background: var(--orange); border: 1px solid var(--orange); color: #fff; }
+.refund-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+@media (max-width: 767px) {
+  .refund-modal .cancel-modal__actions .refund-btn { flex: 1; min-width: 0; padding: 0 14px; }
+}

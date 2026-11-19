@@ -263,7 +263,7 @@ function OrdersTab({ orders, menu, preorder, onTurnOn, onStatus, payments, onVer
     [orders]
   )
   // number shown on the Payments tab = payments waiting for review
-  const paymentCount = payments.filter((o) => o.status === 'payment_submitted').length
+  const paymentCount = payments.filter((o) => o.status === 'payment_submitted' && !o.refundPending).length
   const active = orders.length - counts.completed
   const shown = orders.filter((o) => o.status === filter)
 
@@ -356,6 +356,9 @@ function OrdersTab({ orders, menu, preorder, onTurnOn, onStatus, payments, onVer
 function RejectDialog({ order, onCancel, onConfirm }) {
   const [reason, setReason] = useState(REJECT_REASONS[0])
   const [note, setNote] = useState('')
+  const [refundRef, setRefundRef] = useState('') // GCash refund reference (required)
+  const refundDigits = refundRef.replace(/\D/g, '')
+  const refundOk = refundDigits.length === 13 // GCash reference numbers are 13 digits
   return (
     <Modal title={`Reject ${order.id}?`} onClose={onCancel}>
       <p className="dashboard-modal__text">{order.name} will see the reason you pick.</p>
@@ -373,9 +376,20 @@ function RejectDialog({ order, onCancel, onConfirm }) {
         <textarea id="reject-note" className="dashboard-input" rows={2} value={note}
           onChange={(e) => setNote(e.target.value)} placeholder="Tapsilog is sold out for today." />
       </div>
+      {/* Refund is required: refund the student's GCash payment, then enter the reference number */}
+      <div className="dashboard-field">
+        <label htmlFor="reject-refund">GCash reference number of the refund (required)</label>
+        <input id="reject-refund" className="dashboard-input" type="text" inputMode="numeric" value={refundRef} required
+          onChange={(e) => setRefundRef(e.target.value.replace(/[^\d\s]/g, ''))} placeholder="e.g. 1234 567 890123" />
+        {refundRef && !refundOk && (
+          <p className="dashboard-modal__text" role="alert">A GCash reference number has 13 digits.</p>
+        )}
+        <p className="dashboard-modal__text">Refund {'\u20B1'}{Number(order.total || 0).toLocaleString('en-PH')} to the student’s GCash first, then enter the reference number.</p>
+      </div>
       <div className="dashboard-modal__actions">
         <button type="button" className="dashboard-btn dashboard-btn--outline" onClick={onCancel}>Keep order</button>
-        <button type="button" className="dashboard-btn dashboard-btn--danger" onClick={() => onConfirm(order.uuid, reason)}>Reject order</button>
+        <button type="button" className="dashboard-btn dashboard-btn--danger" disabled={!refundOk}
+          onClick={() => onConfirm(order.uuid, reason, refundDigits)}>Reject order</button>
       </div>
     </Modal>
   )
@@ -1382,8 +1396,9 @@ function AccountTab({ history, openCount, flash, onDeleted }) {
 function PaymentsList({ payments, menu, onVerify, onReject, onView }) {
   const now = useNow() // CHANGE: keeps the "54 min ago" label current, like the other cards
   // Split the pre-queue orders by payment status
-  const submitted = payments.filter((o) => o.status === 'payment_submitted')
-  const awaiting = payments.filter((o) => o.status === 'awaiting_payment')
+  const submitted = payments.filter((o) => o.status === 'payment_submitted' && !o.refundPending)
+  const awaiting = payments.filter((o) => o.status === 'awaiting_payment' && !o.refundPending)
+  const refunding = payments.filter((o) => o.refundPending) // rejected + refunded, waiting for the student to confirm
   return (
     <>
       {/* Group 1: payments the vendor must check (own padded section, like Pending / Past Reviews) */}
@@ -1435,6 +1450,34 @@ function PaymentsList({ payments, menu, onVerify, onReject, onView }) {
         </ul>
       )}
       </section>
+
+      {/* Rejected orders: not canceled until the student confirms the refund */}
+      {refunding.length > 0 && (
+        <section className="pay-group" aria-label="Waiting for refund confirmation">
+          <h2 className="dashboard-payments__group dashboard-payments__group--muted">
+            Waiting for refund confirmation
+            <span className="dashboard-payments__count">{refunding.length}</span>
+          </h2>
+          <ul className="dashboard-list">
+            {refunding.map((o) => (
+              <li key={o.uuid} className="pay-card pay-card--muted">
+                <div className="pay-card__row">
+                  <OrderThumb order={o} menu={menu} />
+                  <div className="dashboard-order__main">
+                    <p className="dashboard-order__title">
+                      <span className="dashboard-order__id">{o.id}</span>
+                      <span>{o.name}</span>
+                    </p>
+                    <p className="dashboard-order__items"><ItemList text={o.items} /></p>
+                    <p className="dashboard-order__items">The order is canceled once {o.name} confirms receiving the refund.</p>
+                  </div>
+                  <span className="dashboard-order__total"><Peso value={o.total} /></span>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {/* Group 2: orders still waiting for the student to pay (only shown when there are any) */}
       {awaiting.length > 0 && (
@@ -1670,7 +1713,7 @@ export default function Dashboard() {
     if (!currentVendorId) return
     const { data, error } = await supabase
       .from('orders')
-      .select('id, code, pickup_name, status, total, placed_at, cancel_reason, gcash_reference, payment_screenshot_path, order_items(name, qty)')
+      .select('id, code, pickup_name, status, total, placed_at, cancel_reason, gcash_reference, payment_screenshot_path, refund_requested_at, order_items(name, qty)')
       .eq('vendor_id', currentVendorId)
       .order('placed_at', { ascending: false })
     if (error) { console.error('Failed to load orders:', error); return }
@@ -1686,6 +1729,8 @@ export default function Dashboard() {
         items: itemsText(o.order_items),
         total: Number(o.total),
         status: o.status,
+        // Vendor rejected + refunded, but the student has not confirmed the refund yet (order is NOT canceled until they do)
+        refundPending: Boolean(o.refund_requested_at) && o.status !== 'cancelled',
       }
       // CHANGE: orders handed over TODAY are also kept in `live` so they appear in Orders > Completed.
       if (o.status === 'completed' && (daysAgoFrom(o.placed_at) === 0 || handedOver.current.has(o.id))) {
@@ -1755,18 +1800,18 @@ export default function Dashboard() {
 
   // Reject an order: cancel it (with a reason) through the order service using
   // the order UUID, then refresh from Supabase.
-  const reject = async (uuid, reason) => {
+  // The order is NOT canceled here: it stays as it is and is marked "refund pending".
+  // It only becomes Canceled once the student confirms they received the refund
+  // (confirm_refund on the student's order page).
+  const reject = async (uuid, reason, refundRef) => {
     try {
-      await transitionOrder(uuid, { to: 'cancelled', reason })
+      const { error } = await supabase.rpc('reject_order', { p_order_id: uuid, p_reason: reason, p_refund_ref: refundRef })
+      if (error) throw error
       await loadOrders()
-      flash('Order rejected')
+      flash('Refund recorded — waiting for the student to confirm it')
     } catch (err) {
-      flash(
-        err?.code === 'ILLEGAL_TRANSITION'
-          ? 'That order has already moved on — refreshing.'
-          : err?.message || 'Could not reject the order. Please try again.'
-      )
-      if (err?.code === 'ILLEGAL_TRANSITION') await loadOrders()
+      flash(err?.message || 'Could not reject the order. Please try again.')
+      await loadOrders()
     } finally {
       setRejecting(null)
     }
@@ -1808,18 +1853,14 @@ export default function Dashboard() {
   const openPaymentReject = (order) => setRejecting({ ...order, kind: 'payment' })
 
   // Called by RejectDialog after the vendor picks a reason (no more window.prompt)
-  const rejectPayment = async (uuid, reason) => {
-    await runPayment(
-      () => transitionOrder(uuid, { to: 'awaiting_payment', reason }),
-      'Payment rejected — student can resubmit'
-    )
-    setRejecting(null) // close the pop-up
+  const rejectPayment = async (uuid, reason, refundRef) => {
+    await reject(uuid, reason, refundRef) // closes the pop-up too
   }
 
   // cancelPayment removed (Cancel option removed from Payments)
 
   // Payments waiting for the vendor to verify
-  const submittedCount = payments.filter((o) => o.status === 'payment_submitted').length
+  const submittedCount = payments.filter((o) => o.status === 'payment_submitted' && !o.refundPending).length
   const pendingCount = submittedCount // Bell dot = payments waiting (Pending stage no longer exists); payments are handled inside Orders > Payments
   const openCount = orders.filter((o) => o.status !== 'completed').length // orders still being handled
 

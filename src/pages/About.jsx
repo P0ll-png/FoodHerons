@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import Icon from '../components/Icon'
 import { useVendors } from '../context/VendorContext'
@@ -30,22 +30,6 @@ const SERVICES = [
     text: 'Search vendors, dishes and stall areas. See who is open now and browse by category.',
   },
 ]
-
-// How-it-works steps
-const STEPS = {
-  students: [
-    { title: 'Order', text: 'Browse and add to cart' },
-    { title: 'Payment', text: 'Pay via GCash to confirm' },
-    { title: 'Ready for pickup', text: 'Show your order number' },
-    { title: 'Completed', text: 'Picked up and paid' },
-  ],
-  vendors: [
-    { title: 'New order', text: 'Receive the order alert' },
-    { title: 'Accepted', text: 'Confirm payment and prepare' },
-    { title: 'Ready for pickup', text: 'Verify the order number' },
-    { title: 'Completed', text: 'Hand over and close the order' },
-  ],
-}
 
 // FAQ content
 const FAQS = [
@@ -165,7 +149,6 @@ export default function About() {
   ]
 
   // State
-  const [track, setTrack] = useState('students')
   const [category, setCategory] = useState('Ordering')
   const [openId, setOpenId] = useState('pickup')
   const [showAll, setShowAll] = useState(false)
@@ -193,18 +176,6 @@ export default function About() {
     return () => timers.forEach(clearTimeout)
   }, [hash, search, key])
 
-  // Reveal steps on scroll
-  const stepsRef = useRef(null)
-  const [stepsSeen, setStepsSeen] = useState(false)
-  useEffect(() => {
-    const el = stepsRef.current
-    if (!el || !('IntersectionObserver' in window)) { setStepsSeen(true); return }
-    const io = new IntersectionObserver(([entry]) => {
-      if (entry.isIntersecting) { setStepsSeen(true); io.disconnect() }
-    }, { threshold: 0.3 })
-    io.observe(el)
-    return () => io.disconnect()
-  }, [])
   // Open / close FAQ
   const toggleFaq = (id) => setOpenId((cur) => (cur === id ? null : id))
 
@@ -256,7 +227,7 @@ export default function About() {
         <div className="container about-story__grid">
           <Photo
             className="about-story__img"
-            src="/images/umak.jpg"
+            src="/images/umak.about.jpg"
             alt="A vendor handing an order to a student"
             label="Vendor handing an order to a student"
           />
@@ -274,7 +245,7 @@ export default function About() {
         </div>
       </section>
 
-      {/* Services + steps */}
+      {/* Services */}
       <section className="about-services container">
         <h2 className="about-title about-title--center">Our Services</h2>
 
@@ -288,38 +259,6 @@ export default function About() {
           ))}
         </div>
 
-        <div className="about-toggle" role="group" aria-label="How it works for">
-          <button
-            type="button"
-            className={`about-pill ${track === 'students' ? 'is-active' : ''}`}
-            aria-pressed={track === 'students'}
-            onClick={() => { setTrack('students'); setStepsSeen(true) }}
-          >
-            For Students
-          </button>
-          <button
-            type="button"
-            className={`about-pill ${track === 'vendors' ? 'is-active' : ''}`}
-            aria-pressed={track === 'vendors'}
-            onClick={() => { setTrack('vendors'); setStepsSeen(true) }}
-          >
-            For Vendors
-          </button>
-        </div>
-
-        <ol key={track} ref={stepsRef} className={`about-steps ${stepsSeen ? 'is-in' : ''}`}>
-          {STEPS[track].map((step, i) => (
-            <li
-              key={step.title}
-              className="about-steps__item"
-              style={{ '--i': i }}
-            >
-              <span className="about-steps__dot">{i + 1}</span>
-              <span className="about-steps__title">{step.title}</span>
-              <span className="about-steps__text">{step.text}</span>
-            </li>
-          ))}
-        </ol>
       </section>
 
       {/* FAQs */}

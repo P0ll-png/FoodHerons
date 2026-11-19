@@ -171,7 +171,7 @@ function VendorResults({
         </div>
       ) : (
         <div className="empty">
-          <span className="empty__emoji" aria-hidden="true">🔍</span>
+          <span className="empty__icon" aria-hidden="true"><Icon name="search" size={44} /></span>
           <h3>No vendors match</h3>
           <p className="text-muted">Try clearing a filter or searching something else.</p>
           <button type="button" className="btn btn--primary mt-4" onClick={clear}>
@@ -245,7 +245,10 @@ export default function Home() {
 
             {/* Search bar (links to the /search page) */}
             <Link to="/search" className="searchbar" aria-label="Search vendors, dishes or stall areas">
-              <Icon name="search" className="searchbar__icon" />
+              <svg className="searchbar__icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <circle cx="11" cy="11" r="7" />
+                <path d="m20 20-3.5-3.5" />
+              </svg>
               <span className="searchbar__placeholder">vendors, dishes or stall areas...</span>
             </Link>
 
