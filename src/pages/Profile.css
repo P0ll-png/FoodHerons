@@ -1414,3 +1414,9 @@
     transform: translateY(-50%) !important;
   }
 }
+
+/* ADDED: no orange shadow on the empty-state button (e.g. "Discover stalls").
+   Scoped to the profile pages only, so other pages keep their button style. */
+.pf-page .ph-empty .btn--primary {
+  box-shadow: none;
+}

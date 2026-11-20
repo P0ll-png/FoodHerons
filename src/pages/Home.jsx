@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect, useRef } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams, useLocation } from 'react-router-dom'
 import Icon from '../components/Icon'
 import VendorCard from '../components/VendorCard'
 import { useVendors } from '../context/VendorContext'
@@ -189,6 +189,7 @@ function VendorResults({
 export default function Home() {
   /* ---------- State & data ---------- */
   const [params, setParams] = useSearchParams()
+  const location = useLocation()                          // ADDED: read #hash from footer links
   const { publicVendors, categories, locationAreas } = useVendors() // approved stores only (edited from the vendor dashboard)
   const [activeCategory, setActiveCategory] = useState(null) // clicked category tile (null = none yet)
   const resultsRef = useRef(null)                         // category results section (we scroll to it)
@@ -217,6 +218,14 @@ export default function Home() {
       resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }
   }, [activeCategory])
+
+  // ADDED: footer links like /#campus-map and /?open=1#vendors-near-you.
+  // The router doesn't scroll to #hash by itself, so do it here.
+  useEffect(() => {
+    if (!location.hash) return
+    const el = document.getElementById(location.hash.slice(1))
+    if (el) requestAnimationFrame(() => el.scrollIntoView({ behavior: 'smooth', block: 'start' }))
+  }, [location.key, location.hash])
 
   // Clicking the active tile again switches it off
   const pickCategory = (id) => setActiveCategory((cur) => (cur === id ? null : id))
@@ -337,7 +346,7 @@ export default function Home() {
         )}
 
         {/* ---------- Campus map & location ---------- */}
-        <div className="container section map-section">
+        <div id="campus-map" className="container section map-section">
           <div className="section-head">
             <div>
               <h2 className="cats-panel__title">Campus Map &amp; Location</h2>
@@ -360,7 +369,7 @@ export default function Home() {
         </div>
 
         {/* ---------- Directory: Vendors near you (with filter bar) ---------- */}
-        <div className="container section" role="region" aria-labelledby="dir-heading">
+        <div id="vendors-near-you" className="container section" role="region" aria-labelledby="dir-heading">
           <VendorResults
             list={publicVendors}
             locationAreas={locationAreas}

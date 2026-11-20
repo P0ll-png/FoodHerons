@@ -19,6 +19,8 @@ import Search from './pages/Search'
 import Profile from './pages/Profile'
 import ConfirmEmail from './pages/ConfirmEmail'   // [ADD]
 import About from './pages/About'
+import ForgotPassword from './pages/ForgotPassword'   // [ADD]
+import ResetPassword from './pages/ResetPassword'     // [ADD]
 
 function AuthSplash() {
   return (
@@ -73,6 +75,8 @@ export default function App() {
             <Route path="/admin" element={<RequireRole role="admin"><Admin /></RequireRole>} />
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />   {/* [ADD] */}
+            <Route path="/reset-password" element={<ResetPassword />} />     {/* [ADD] link in the reset email opens this */}
             <Route path="/about" element={<About />} />
              <Route path="/auth/confirmed" element={<ConfirmEmail />} />   {/* [ADD] email confirmation landing page */}
             <Route path="*" element={<NotFound />} />

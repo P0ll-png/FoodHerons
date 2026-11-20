@@ -62,7 +62,7 @@ export default function Login() {
           <label className="auth__check">
             <input type="checkbox" /> Remember me
           </label>
-          <a href="#" className="auth__forgot" onClick={(e) => e.preventDefault()}>Forgot password?</a>
+          <Link to="/forgot-password" className="auth__forgot">Forgot password?</Link>   {/* [CHANGE] was a dead link */}
         </div>
 
        <button type="submit" className="auth__submit" disabled={submitting}>Log in</button>  

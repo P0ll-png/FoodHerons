@@ -128,7 +128,8 @@ export function AuthToast({ title, text, icon = 'mail', onClose }) {
 /* ---------- [ADD] "Check your inbox" body: message, resend countdown, go back ---------- */
 const RESEND_COOLDOWN = 60   // seconds. Matches Supabase's 60s resend limit.
 
-export function CheckInbox({ onResend, onChangeEmail }) {
+// [CHANGE] new optional `text` prop so other pages (forgot password) can reuse this; default text is unchanged
+export function CheckInbox({ onResend, onChangeEmail, text = 'Open the link in the email to activate your account. Can’t find it? Check your spam folder.' }) {
   const [cooldown, setCooldown] = useState(RESEND_COOLDOWN)   
   const [status, setStatus] = useState('')                    // '', 'sending', 'sent', 'error'
 
@@ -152,9 +153,7 @@ export function CheckInbox({ onResend, onChangeEmail }) {
 
   return (
     <div className="inbox" role="status" aria-live="polite">
-      <p className="inbox__text">
-        Open the link in the email to activate your account. Can’t find it? Check your spam folder.
-      </p>
+      <p className="inbox__text">{text}</p>
 
       {/* disabled (faded) while counting down, e.g. "Resend in 42s" */}
       <button type="button" className="auth__submit inbox__resend"

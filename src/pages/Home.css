@@ -925,3 +925,7 @@
   .searchbar:hover .searchbar__icon, .searchbar:hover .searchbar__placeholder,
   .searchbar:focus-visible .searchbar__icon, .searchbar:focus-visible .searchbar__placeholder { transform: none; }
 }
+
+/* ADDED: keep footer-link targets clear of the sticky header */
+#campus-map,
+#vendors-near-you { scroll-margin-top: calc(var(--header-h) + 12px); }

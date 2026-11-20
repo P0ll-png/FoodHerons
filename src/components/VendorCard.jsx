@@ -4,6 +4,27 @@ import { useVendors } from '../context/VendorContext'
 import { useAuth } from '../context/AuthContext'
 import './VendorCard.css'
 
+// ADDED: tiny toast helper. Draws one shared toast on <body> so it survives
+// the card unmounting and isn't affected by the card's hover transform.
+let toastTimer
+function showToast(message) {
+  let el = document.getElementById('vcard-toast')
+  if (!el) {
+    el = document.createElement('div')
+    el.id = 'vcard-toast'
+    el.className = 'vcard-toast'
+    el.setAttribute('role', 'status')
+    el.setAttribute('aria-live', 'polite')
+    document.body.appendChild(el)
+  }
+  el.textContent = message
+  el.classList.remove('is-show')
+  void el.offsetWidth // restart the animation if clicked again quickly
+  el.classList.add('is-show')
+  clearTimeout(toastTimer)
+  toastTimer = setTimeout(() => el.classList.remove('is-show'), 2200)
+}
+
 export default function VendorCard({ vendor, isFavorite, onToggleFavorite }) {
   const { categoryName, favoriteIds, setFavorite } = useVendors()
   const { user } = useAuth()
@@ -39,6 +60,8 @@ export default function VendorCard({ vendor, isFavorite, onToggleFavorite }) {
     const next = !fav
     if (!isControlled) setFavorite(id, next)
     onToggleFavorite?.(id, next)
+    // ADDED: toast on add / remove
+    showToast(next ? `${name} added to favourites` : `${name} removed from favourites`)
   }
 
   return (

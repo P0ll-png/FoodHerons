@@ -32,8 +32,8 @@ export default function Footer() {
         
         <nav className="footer__col" aria-label="Explore">
           <h3>Explore</h3>
-          <Link to="/">Open Now </Link>
-          <Link to="/">View Map</Link>
+          <Link to="/?open=1#vendors-near-you">Open Now </Link>
+          <Link to="/#campus-map">View Map</Link>
           <Link to="/about">About us</Link>
         </nav>
 
