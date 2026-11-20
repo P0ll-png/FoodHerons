@@ -1,11 +1,13 @@
-import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import Icon from './Icon'
 import { useVendors } from '../context/VendorContext'
+import { useAuth } from '../context/AuthContext'
 import './VendorCard.css'
 
 export default function VendorCard({ vendor, isFavorite, onToggleFavorite }) {
-  const { categoryName } = useVendors()
+  const { categoryName, favoriteIds, setFavorite } = useVendors()
+  const { user } = useAuth()
+  const navigate = useNavigate()
   const {
     id,
     name,
@@ -23,15 +25,19 @@ export default function VendorCard({ vendor, isFavorite, onToggleFavorite }) {
   } = vendor
 
   const isControlled = typeof isFavorite === 'boolean'
-  const [localFav, setLocalFav] = useState(false)
-  const fav = isControlled ? isFavorite : localFav
+  const fav = isControlled ? isFavorite : favoriteIds.includes(id)
 
   const handleFavorite = (e) => {
     // The card is a <Link>, so stop the click from navigating
     e.preventDefault()
     e.stopPropagation()
+    // Logged-out visitors are sent to log in; favourites need an account.
+    if (!user) {
+      navigate('/login')
+      return
+    }
     const next = !fav
-    if (!isControlled) setLocalFav(next)
+    if (!isControlled) setFavorite(id, next)
     onToggleFavorite?.(id, next)
   }
 

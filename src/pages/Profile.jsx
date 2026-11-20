@@ -768,7 +768,7 @@ export default function Profile() {
   const user = auth.user
   const { updateUser, logout } = auth
   const navigate = useNavigate()
-  const { getVendor } = useVendors()
+  const { getVendor, setFavorite } = useVendors()
   const [params, setParams] = useSearchParams()
   const [orders, setOrders] = useState([]) // adapted order rows (both active + past)
   const [favorites, setFavorites] = useState([]) // list of vendor_id strings
@@ -859,10 +859,9 @@ export default function Profile() {
   const activeOrders = orders.filter((o) => ACTIVE_STATUSES.includes(o.rawStatus))
   const pastOrders = orders.filter((o) => o.rawStatus === 'completed' || o.rawStatus === 'cancelled')
 
-  // Remove a favorite in Supabase, then drop it from local state.
+  // Remove a favorite in Supabase (shared context keeps the hearts elsewhere in sync), then drop it from local state.
   const removeFavorite = async (vendorId) => {
-    const { error } = await supabase.from('favorites').delete().eq('student_id', userId).eq('vendor_id', vendorId)
-    if (error) { console.error('Failed to remove favorite:', error); return }
+    if (!(await setFavorite(vendorId, false))) return
     setFavorites((l) => l.filter((id) => id !== vendorId))
   }
 

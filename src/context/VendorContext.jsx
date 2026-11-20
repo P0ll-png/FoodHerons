@@ -120,6 +120,47 @@ export function VendorProvider({ children }) {
     [rawVendors, user?.id]
   )
 
+  // Vendor ids the logged-in user has favourited (RLS scopes the rows to them).
+  const [favoriteIds, setFavoriteIds] = useState([])
+  useEffect(() => {
+    if (!user?.id) {
+      setFavoriteIds([])
+      return
+    }
+    let active = true
+    supabase
+      .from('favorites')
+      .select('vendor_id')
+      .eq('student_id', user.id)
+      .then(({ data, error }) => {
+        if (!active) return
+        if (error) console.error('Failed to load favorites:', error)
+        else setFavoriteIds((data || []).map((f) => f.vendor_id))
+      })
+    return () => {
+      active = false
+    }
+  }, [user?.id])
+
+  // Add or remove a favourite in Supabase, then update local state.
+  // Returns true on success so callers can react to a failed write.
+  const setFavorite = useCallback(
+    async (vendorId, on) => {
+      if (!user?.id) return false
+      const { error } = on
+        ? await supabase.from('favorites').insert({ student_id: user.id, vendor_id: vendorId })
+        : await supabase.from('favorites').delete().eq('student_id', user.id).eq('vendor_id', vendorId)
+      // 23505 = already a favourite; the end state is what the user asked for.
+      if (error && error.code !== '23505') {
+        console.error('Failed to update favorite:', error)
+        return false
+      }
+      setFavoriteIds((ids) => (on ? (ids.includes(vendorId) ? ids : [...ids, vendorId]) : ids.filter((i) => i !== vendorId)))
+      return true
+    },
+    [user?.id]
+  )
+
   // Re-check "open / closed" every minute so the status stays correct.
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
@@ -265,6 +306,8 @@ export function VendorProvider({ children }) {
       loading,
       currentVendorId,
       getVendor,
+      favoriteIds,
+      setFavorite,
       updateVendorInfo,
       setPreorderEnabled,
       saveMenuItem,
@@ -280,6 +323,8 @@ export function VendorProvider({ children }) {
       loading,
       currentVendorId,
       getVendor,
+      favoriteIds,
+      setFavorite,
       updateVendorInfo,
       setPreorderEnabled,
       saveMenuItem,
