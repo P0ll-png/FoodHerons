@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import Icon from '../components/Icon'
 import { useAuth } from '../context/AuthContext'
 import { useVendors } from '../context/VendorContext'
@@ -137,7 +137,8 @@ function ConfirmModal({ title, text, select, children, confirmLabel, tone = 'pri
 
 // Admin page root
 export default function Admin() {
-  const { user } = useAuth()
+  const { user, logout } = useAuth()
+  const navigate = useNavigate()
   const { categories, locationAreas, categoryName } = useVendors()
 
   // State
@@ -191,6 +192,17 @@ export default function Admin() {
     [vendors],
   )
 
+  // Sign out, then leave the admin area
+  const handleLogout = async () => {
+    try {
+      await logout()
+    } catch (e) {
+      setError(e.message || 'Could not log out.')
+      return
+    }
+    navigate('/login')
+  }
+
   if (loading) {
     return (
       <div className="container admin">
@@ -241,6 +253,15 @@ export default function Admin() {
             title="Refresh"
           >
             <Icon name="history" size={16} />
+          </button>
+          <button
+            type="button"
+            className="admin-iconbtn"
+            onClick={handleLogout}
+            aria-label="Log out"
+            title="Log out"
+          >
+            <Icon name="logout" size={16} />
           </button>
           <span className="admin-avatar" title={`Signed in as ${who}`}>
             {initials(who) || 'AD'}
@@ -1049,6 +1070,7 @@ function ReviewsPanel({ reviews, vendorName, onChanged, setError }) {
       ))}
     </ul>
 
+    {/* Delete confirm */}
     {confirmReview && (
       <ConfirmModal
         title={`Delete ${confirmReview.author_name}'s review?`}
