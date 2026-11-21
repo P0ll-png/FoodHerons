@@ -58,7 +58,7 @@ export function AuthDivider({ children = 'or' }) {
   )
 }
 
-// Frontend-only stub: wire `onClick` to Facebook Login (via the backend) later.
+// `onClick` is wired to Supabase OAuth (signInWithOAuth) by Login and Signup.
 export function FacebookButton({ onClick, label = 'Continue with Facebook' }) {
   return (
     <button type="button" className="auth__fb" onClick={onClick}>
@@ -75,7 +75,7 @@ export function FacebookButton({ onClick, label = 'Continue with Facebook' }) {
 }
 
 /* [ADD] "Continue with Google" button. Same look as FacebookButton (reuses the .auth__fb class), plus .auth__google for spacing. */
-// Frontend-only stub: wire `onClick` to Google Login (via the backend) later.
+// `onClick` is wired to Supabase OAuth (signInWithOAuth) by Login and Signup.
 export function GoogleButton({ onClick, label = 'Continue with Google' }) {
   return (
     <button type="button" className="auth__fb auth__google" onClick={onClick}>

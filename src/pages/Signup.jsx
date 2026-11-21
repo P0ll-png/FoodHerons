@@ -17,7 +17,7 @@ import AuthLayout, {
 export default function Signup() {
   const navigate = useNavigate()
   // added `resendVerification` (used by the Resend button)
-  const { signup, resendVerification } = useAuth()
+  const { signup, resendVerification, loginWithProvider } = useAuth()
   const [params] = useSearchParams()
   const [role, setRole] = useState(params.get('role') === 'vendor' ? 'vendor' : 'student')
   const [form, setForm] = useState({ name: '', email: '', phone: '', password: '', store: '' })
@@ -61,8 +61,20 @@ export default function Signup() {
   }
 
 
-  const signupWithFacebook = () => {}
-  const signupWithGoogle = () => {}
+  // [CHANGE] social signup creates a student account (role/store can't be passed through OAuth)
+  const socialSignup = async (provider) => {
+    if (role === 'vendor') {
+      return setError('Vendors: create your store with email and password. You can connect Google or Facebook afterwards from your dashboard.')
+    }
+    setError('')
+    try {
+      await loginWithProvider(provider)
+    } catch (err) {
+      setError(err?.message || 'Unable to continue. Please try again.')
+    }
+  }
+  const signupWithFacebook = () => socialSignup('facebook')
+  const signupWithGoogle = () => socialSignup('google')
     // [ADD] full "Check your inbox" screen, shown after a successful signup
   if (sentTo) {
     return (

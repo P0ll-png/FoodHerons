@@ -5,7 +5,7 @@ import AuthLayout, { PasswordField, AuthDivider, AuthTerms, FacebookButton, Goog
 
 export default function Login() {
   const navigate = useNavigate()
-  const { login } = useAuth()
+  const { login, loginWithProvider } = useAuth()
   const [form, setForm] = useState({ email: '', password: '' })
   const [error, setError] = useState('')
   const [toast, setToast] = useState(null)             // [ADD] { title, text }
@@ -33,11 +33,17 @@ export default function Login() {
     }
   }
 
-  // Facebook login is a deferred stub.
-  const loginWithFacebook = () => {}
-
-  // [ADD] Google login is a deferred stub too.
-  const loginWithGoogle = () => {}
+  // [CHANGE] social login: the browser leaves for the provider and returns to /auth/callback
+  const socialLogin = async (provider) => {
+    setError('')
+    try {
+      await loginWithProvider(provider)
+    } catch (err) {
+      setError(err?.message || 'Unable to continue. Please try again.')
+    }
+  }
+  const loginWithFacebook = () => socialLogin('facebook')
+  const loginWithGoogle = () => socialLogin('google')
 
   const update = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
 

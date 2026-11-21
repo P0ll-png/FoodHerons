@@ -151,14 +151,72 @@ export function AuthProvider({ children }) {
     if (error) throw error
   }, [])
 
+  // [ADD] forgot password: Supabase answers the same for unknown emails, so existence is never revealed
+  const requestPasswordReset = useCallback(async (email) => {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    })
+    if (error) {
+      if (error.status === 429 || /rate limit/i.test(error.message || '')) {
+        throw new Error('Too many requests. Please wait a minute and try again.')
+      }
+      throw new Error('Unable to send the reset link. Please try again.')
+    }
+  }, [])
+
+  // [ADD] reset password: the recovery link signs the user in; set the new password, then sign out
+  const completePasswordReset = useCallback(async (password) => {
+    const { error } = await supabase.auth.updateUser({ password })
+    if (error) throw error
+    await supabase.auth.signOut()
+    setUser(null)
+  }, [])
+
+  // [ADD] Google / Facebook sign-in (the browser leaves for the provider on success)
+  const loginWithProvider = useCallback(async (provider) => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider,
+      options: { redirectTo: `${window.location.origin}/auth/callback` },
+    })
+    if (error) throw error
+  }, [])
+
+  // [ADD] connected accounts (needs "Manual Linking" enabled in Supabase)
+  const getLinkedProviders = useCallback(async () => {
+    const { data, error } = await supabase.auth.getUserIdentities()
+    if (error) throw error
+    return (data?.identities ?? []).map((i) => i.provider)
+  }, [])
+
+  const linkProvider = useCallback(async (provider, returnPath) => {
+    const { error } = await supabase.auth.linkIdentity({
+      provider,
+      options: { redirectTo: `${window.location.origin}${returnPath}` },
+    })
+    if (error) throw error
+  }, [])
+
+  const unlinkProvider = useCallback(async (provider) => {
+    const { data, error } = await supabase.auth.getUserIdentities()
+    if (error) throw error
+    const identity = (data?.identities ?? []).find((i) => i.provider === provider)
+    if (!identity) return
+    const { error: unlinkError } = await supabase.auth.unlinkIdentity(identity)
+    if (unlinkError) throw unlinkError
+  }, [])
+
   const deleteAccount = useCallback(() => {
     throw new Error('Account deletion is not available yet.')
   }, [])
 
    // added `resendVerification` to both the object and the dependency array
   const value = useMemo(
-    () => ({ user, loading, login, logout, signup, resendVerification, updateUser, changePassword, deleteAccount }),
-    [user, loading, login, logout, signup, resendVerification, updateUser, changePassword, deleteAccount]
+    () => ({
+      user, loading, login, logout, signup, resendVerification, updateUser, changePassword, deleteAccount,
+      requestPasswordReset, completePasswordReset, loginWithProvider, getLinkedProviders, linkProvider, unlinkProvider,
+    }),
+    [user, loading, login, logout, signup, resendVerification, updateUser, changePassword, deleteAccount,
+      requestPasswordReset, completePasswordReset, loginWithProvider, getLinkedProviders, linkProvider, unlinkProvider]
   )
   return (
     <AuthContext.Provider value={value}>

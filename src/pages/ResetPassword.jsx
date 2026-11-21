@@ -1,13 +1,19 @@
 import { useState, useEffect, useRef } from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext'
 import AuthLayout, { PasswordField, AuthToast, isStrongPassword } from '../components/AuthLayout'
 
 // Step 2 of "forgot password"  ->  route: /reset-password
-// The link in the reset email opens this page (e.g. /reset-password?token=...).
+// The link in the reset email signs the user in with a recovery session (Supabase reads it from the URL),
+// so this page waits for that session, then lets them set a new password.
 export default function ResetPassword() {
   const navigate = useNavigate()
-  const [params] = useSearchParams()
-  const token = params.get('token') // TODO: send this with the new password once there is a backend
+  const { user, completePasswordReset } = useAuth()
+  // Supabase puts error details in the URL when the link is expired or invalid
+  const [linkFailed, setLinkFailed] = useState(() =>
+    /error=|error_code=/.test(window.location.hash + window.location.search)
+  )
+  const [ready, setReady] = useState(false)          // latched once the recovery session is seen
 
   const [form, setForm] = useState({ password: '', confirm: '' })
   const [error, setError] = useState('')
@@ -17,8 +23,15 @@ export default function ResetPassword() {
 
   useEffect(() => () => clearTimeout(timerRef.current), [])
 
-  // TODO (when auth exists): update the password using `token` here.
-  const updatePassword = async (token, password) => {}
+  useEffect(() => { if (user) setReady(true) }, [user])
+
+  // No recovery session after 8 seconds -> treat the link as invalid
+  useEffect(() => {
+    if (user) return
+    const t = setTimeout(() => setLinkFailed(true), 8000)
+    return () => clearTimeout(t)
+  }, [user])
+
 
   const update = (k) => (e) => { setForm((f) => ({ ...f, [k]: e.target.value })); if (error) setError('') }
 
@@ -30,13 +43,30 @@ export default function ResetPassword() {
     setError('')
     setSubmitting(true)
     try {
-      await updatePassword(token, form.password)
+      await completePasswordReset(form.password)
       setToast({ title: 'Password updated', text: 'Redirecting you to log in…' })
       timerRef.current = setTimeout(() => navigate('/login'), 1500)
     } catch (err) {
       setError(err?.message || 'Unable to update your password. The link may have expired.')
       setSubmitting(false)
     }
+  }
+
+  if (!user && !ready) {
+    return (
+      <AuthLayout
+        variant="recovery"
+        title={linkFailed ? 'Link expired or invalid' : 'Checking your link…'}
+        message={linkFailed ? 'Request a new reset link to continue.' : 'Hang tight, verifying your reset link.'}
+      >
+        {linkFailed && (
+          <>
+            <p className="auth__alt"><Link to="/forgot-password">Request a new link</Link></p>
+            <p className="auth__alt"><Link to="/login">← Back to log in</Link></p>
+          </>
+        )}
+      </AuthLayout>
+    )
   }
 
   return (
@@ -53,7 +83,7 @@ export default function ResetPassword() {
 
         {error && <p className="auth__error" role="alert">{error}</p>}
 
-        <button type="submit" className="auth__submit" disabled={submitting}>Update password</button>
+        <button type="submit" className="auth__submit" disabled={submitting}>{submitting ? 'Updating…' : 'Update password'}</button>
 
         <p className="auth__alt"><Link to="/login">← Back to log in</Link></p>
       </form>

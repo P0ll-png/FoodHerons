@@ -45,6 +45,9 @@ order** (each is idempotent-where-specified, so a re-run is safe):
     the Supabase `storage` schema (hosted project), not bare Postgres.** New
     orders now start `awaiting_payment`, and a vendor must set a `gcash_number`
     (Store info) before pre-ordering works against their store.
+11. `migrations/0011_oauth_profile.sql` — updates the signup trigger so Google/Facebook
+    users get a full profile (name, email fallback, avatar). OAuth sign-ups are
+    always students. Run it in the SQL editor.
 
 ## 2. Run the demo-account seed script
 

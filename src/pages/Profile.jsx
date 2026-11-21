@@ -145,8 +145,27 @@ function EditProfile({ user, updateUser, onBack }) {
   const [err, setErr] = useState('')
   const [photoMenu, setPhotoMenu] = useState(false)
   const photoWrap = useRef(null)
-  const [fb, setFb] = useState(false) // TODO: read/write the real Facebook link status from your API
-  const [google, setGoogle] = useState(false) // [ADD] TODO: read/write the real Google link status from your API (e.g. Supabase linkIdentity / unlinkIdentity)
+  // [CHANGE] connected accounts reflect the real Supabase identities
+  const { getLinkedProviders, linkProvider, unlinkProvider } = useAuth()
+  const [linked, setLinked] = useState({ facebook: false, google: false })
+  useEffect(() => {
+    getLinkedProviders()
+      .then((list) => setLinked({ facebook: list.includes('facebook'), google: list.includes('google') }))
+      .catch(() => {})
+  }, [getLinkedProviders])
+  const toggleProvider = async (provider) => {
+    setErr('')
+    try {
+      if (linked[provider]) {
+        await unlinkProvider(provider)
+        setLinked((l) => ({ ...l, [provider]: false }))
+      } else {
+        await linkProvider(provider, '/profile')
+      }
+    } catch (e) {
+      setErr(e?.message || 'Could not update the connected account.')
+    }
+  }
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
 
   // Mobile number: fixed +63 prefix, the student types the 10-digit number (saved as "+63 917 123 4567").
@@ -283,14 +302,14 @@ function EditProfile({ user, updateUser, onBack }) {
         <div className="pf-connect">
           <span className="pf-connect__icon"><Icon name="facebook" size={18} /></span>
           <span className="pf-connect__name">Facebook</span>
-          <button type="button" className="pf-link" onClick={() => setFb((v) => !v)}>{fb ? 'Disconnect' : 'Connect'}</button>
+          <button type="button" className="pf-link" onClick={() => toggleProvider('facebook')}>{linked.facebook ? 'Disconnect' : 'Connect'}</button>
         </div>
 
         {/* [ADD] Google: same row layout as Facebook (icon, name, Connect / Disconnect) */}
         <div className="pf-connect">
           <span className="pf-connect__icon pf-connect__icon--google"><Icon name="google" size={18} /></span>
           <span className="pf-connect__name">Google</span>
-          <button type="button" className="pf-link" onClick={() => setGoogle((v) => !v)}>{google ? 'Disconnect' : 'Connect'}</button>
+          <button type="button" className="pf-link" onClick={() => toggleProvider('google')}>{linked.google ? 'Disconnect' : 'Connect'}</button>
         </div>
       </section>
     </>

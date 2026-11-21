@@ -78,6 +78,7 @@ export default function App() {
             <Route path="/forgot-password" element={<ForgotPassword />} />   {/* [ADD] */}
             <Route path="/reset-password" element={<ResetPassword />} />     {/* [ADD] link in the reset email opens this */}
             <Route path="/about" element={<About />} />
+             <Route path="/auth/callback" element={<ConfirmEmail oauth />} />   {/* [ADD] Google / Facebook sign-in landing page */}
              <Route path="/auth/confirmed" element={<ConfirmEmail />} />   {/* [ADD] email confirmation landing page */}
             <Route path="*" element={<NotFound />} />
             

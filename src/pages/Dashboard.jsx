@@ -1173,9 +1173,25 @@ function AccountTab({ history, openCount, flash, onDeleted }) {
   const user = auth?.user || {}
   const saved = { name: user.full_name || '', email: user.email || '' }
 
-  // [ADD] --- Connected accounts (Google). TODO: read/write the real link status from your API (e.g. Supabase linkIdentity / unlinkIdentity).
-  const [googleLinked, setGoogleLinked] = useState(false)
-  const [fbLinked, setFbLinked] = useState(false)   // [ADD] Facebook link status. TODO: read/write from your API too.
+  // [CHANGE] --- Connected accounts: reflect the real Supabase identities
+  const [linked, setLinked] = useState({ facebook: false, google: false })
+  useEffect(() => {
+    auth?.getLinkedProviders?.()
+      .then((list) => setLinked({ facebook: list.includes('facebook'), google: list.includes('google') }))
+      .catch(() => {})
+  }, [auth?.getLinkedProviders])
+  const toggleProvider = async (provider) => {
+    try {
+      if (linked[provider]) {
+        await auth.unlinkProvider(provider)
+        setLinked((l) => ({ ...l, [provider]: false }))
+      } else {
+        await auth.linkProvider(provider, '/dashboard')
+      }
+    } catch (e) {
+      flash(e?.message || 'Could not update the connected account.')
+    }
+  }
 
   // --- Account details (login name + email)
   const [details, setDetails] = useState(saved)
@@ -1345,12 +1361,12 @@ function AccountTab({ history, openCount, flash, onDeleted }) {
             <div className="dashboard-connect">
               <span className="dashboard-connect__icon dashboard-connect__icon--fb"><Icon name="facebook" size={18} /></span>
               <span className="dashboard-connect__name">Facebook</span>
-              <button type="button" className="dashboard-connect__link" onClick={() => setFbLinked((v) => !v)}>{fbLinked ? 'Disconnect' : 'Connect'}</button>
+              <button type="button" className="dashboard-connect__link" onClick={() => toggleProvider('facebook')}>{linked.facebook ? 'Disconnect' : 'Connect'}</button>
             </div>
             <div className="dashboard-connect">
               <span className="dashboard-connect__icon dashboard-connect__icon--google"><Icon name="google" size={18} /></span>
               <span className="dashboard-connect__name">Google</span>
-              <button type="button" className="dashboard-connect__link" onClick={() => setGoogleLinked((v) => !v)}>{googleLinked ? 'Disconnect' : 'Connect'}</button>
+              <button type="button" className="dashboard-connect__link" onClick={() => toggleProvider('google')}>{linked.google ? 'Disconnect' : 'Connect'}</button>
             </div>
           </section>
         </div>

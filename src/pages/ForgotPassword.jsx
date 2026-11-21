@@ -1,21 +1,23 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext'
 import AuthLayout, { CheckInbox } from '../components/AuthLayout'
 
 // Step 1 of "forgot password"  ->  route: /forgot-password
 // Type your email -> "Check your email" screen (with the same 60s resend countdown as sign up).
 export default function ForgotPassword() {
+  const { requestPasswordReset } = useAuth()
   const [email, setEmail] = useState('')
   const [error, setError] = useState('')
   const [sent, setSent] = useState(false)
   const [submitting, setSubmitting] = useState(false)
 
-  // TODO (when auth exists): request the real "send reset email" here (e.g. Supabase's resetPasswordForEmail).
   // Same screen whether or not the email has an account, so nobody can probe for accounts.
-  const sendResetEmail = async (address) => {}
+  const sendResetEmail = (address) => requestPasswordReset(address)
 
   const submit = async (e) => {
     e.preventDefault()
+    if (!/^\S+@\S+\.\S+$/.test(email.trim())) return setError('Enter a valid email address.')
     setError('')
     setSubmitting(true)
     try {
@@ -48,7 +50,7 @@ export default function ForgotPassword() {
 
           {error && <p className="auth__error" role="alert">{error}</p>}
 
-          <button type="submit" className="auth__submit" disabled={submitting}>Send reset link</button>
+          <button type="submit" className="auth__submit" disabled={submitting}>{submitting ? 'Sending…' : 'Send reset link'}</button>
 
           <p className="auth__alt"><Link to="/login">← Back to log in</Link></p>
         </form>
